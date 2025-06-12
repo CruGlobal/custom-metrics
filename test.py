@@ -2,7 +2,6 @@ import requests
 import time
 import os
 PROMETHEUS_URL = os.getenv("PROMETHEUS_URL", "http://localhost:9090")
-PROMETHEUS_speed = os.getenv("PROMETHEUS_URL", "http://localhost:9798")
 
 def query_prometheus(query, opt=PROMETHEUS_URL):
     url = f"{opt}/api/v1/query"
@@ -31,7 +30,7 @@ def push_to_bigquery(rows):
 
 print("Pulling metrics from Prometheus...")
 prom_data = query_prometheus("up")
-prom_speed_data = query_prometheus("up", PROMETHEUS_speed)
+prom_speed_data = query_prometheus("speedtest_download_bits_per_second", PROMETHEUS_URL)
 rows = parse_and_format(prom_data)
 rows1 = parse_and_format(prom_speed_data)
 print(f"Pushing {len(rows)} rows to BigQuery...")
