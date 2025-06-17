@@ -47,3 +47,5 @@ htmlcov/
 .tox/
 coverage.xml
 *.cover 
+
+.git_creden

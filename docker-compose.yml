@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  custom-metrics:
+    build: .
+    volumes:
+      - ./config/credentials.json:/app/config/credentials.json:ro
+    environment:
+      - BIGQUERY_PROJECT=${BIGQUERY_PROJECT}
+      - BIGQUERY_DATASET=${BIGQUERY_DATASET}
+      - BIGQUERY_TABLE=${BIGQUERY_TABLE}
+      - PROMETHEUS_URL=${PROMETHEUS_URL}
+      - LOCATION=${LOCATION}
+    restart: unless-stopped 
