@@ -127,35 +127,31 @@ python3 -m unittest test_network_monitor.TestNetworkMonitor.test_query_prometheu
 
 ### Ping Table Schema
 ```sql
-CREATE TABLE `your-project-id.internet_monitoring1.ping` (
-  timestamp TIMESTAMP,
-  site_id STRING,
-  location STRING,
-  google_up FLOAT,
-  apple_up FLOAT,
-  github_up FLOAT,
-  pihole_up FLOAT,
-  node_up FLOAT,
-  speedtest_up FLOAT,
-  http_latency FLOAT,
-  http_samples FLOAT,
-  http_time FLOAT,
-  http_content_length FLOAT,
-  http_duration FLOAT
-)
+site_id:STRING,
+timestamp:TIMESTAMP,
+location:STRING,
+google_up:FLOAT,
+apple_up:FLOAT,
+github_up:FLOAT,
+pihole_up:FLOAT,
+node_up:FLOAT,
+speedtest_up:FLOAT,
+http_latency:FLOAT,
+http_samples:FLOAT,
+http_time:FLOAT,
+http_content_length:FLOAT,
+http_duration:FLOAT
 ```
 
 ### Speed Table Schema
 ```sql
-CREATE TABLE `your-project-id.internet_monitoring1.speed` (
-  timestamp TIMESTAMP,
-  site_id STRING,
-  location STRING,
-  download_mbps FLOAT,
-  upload_mbps FLOAT,
-  ping_ms FLOAT,
-  jitter_ms FLOAT
-)
+site_id:STRING,
+timestamp:TIMESTAMP,
+location:STRING,
+download_mbps:FLOAT,
+upload_mbps:FLOAT,
+ping_ms:FLOAT,
+jitter_ms:FLOAT
 ```
 
 ## Contributing

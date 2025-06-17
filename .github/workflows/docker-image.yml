@@ -30,6 +30,11 @@ jobs:
       uses: docker/metadata-action@v5
       with:
         images: ${{ secrets.DOCKER_USERNAME }}/custom-metrics
+        tags: |
+          type=raw,value=latest,enable={{is_default_branch}}
+          type=sha,format=short
+          type=ref,event=branch
+          type=ref,event=tag
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
@@ -39,6 +44,8 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/custom-metrics:buildcache
+        cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/custom-metrics:buildcache,mode=max
         build-args: |
           BUILDPLATFORM=linux/arm/v8
           TARGETPLATFORM=linux/arm/v8
