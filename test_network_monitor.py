@@ -5,7 +5,10 @@ import json
 import requests
 from datetime import datetime
 import main
-from main import NetworkMonitor, SITE_ID_FILE, METRICS, BIGQUERY_PROJECT, BIGQUERY_DATASET, BIGQUERY_TABLE
+from main import (
+    NetworkMonitor, SITE_ID_FILE, PING_METRICS, SPEED_METRICS,
+    BIGQUERY_PROJECT, BIGQUERY_DATASET, PING_TABLE, SPEED_TABLE
+)
 
 class TestNetworkMonitor(unittest.TestCase):
     def setUp(self):
@@ -31,7 +34,8 @@ class TestNetworkMonitor(unittest.TestCase):
         self.mock_getenv.side_effect = lambda key, default=None: {
             'BIGQUERY_PROJECT': 'test-project',
             'BIGQUERY_DATASET': 'test-dataset',
-            'BIGQUERY_TABLE': 'test-table',
+            'PING_TABLE': 'test-ping',
+            'SPEED_TABLE': 'test-speed',
             'PROMETHEUS_URL': 'http://test-prometheus:9090',
             'LOCATION': 'test-location'
         }.get(key, default)
@@ -100,65 +104,44 @@ class TestNetworkMonitor(unittest.TestCase):
         result = self.monitor._query_prometheus("test_query")
         self.assertIsNone(result)
 
-    def test_parse_prometheus_result(self):
-        """Test parsing Prometheus result."""
-        test_result = {
-            'data': {
-                'result': [{
-                    'metric': {
-                        'instance': 'test-instance',
-                        'job': 'test-job',
-                        'ping_target': 'google',
-                        'ping_time': '0.1',
-                        'ping_samples': '10'
-                    },
-                    'value': ['1234567890', '1.0']
-                }]
-            }
-        }
-
-        parsed_data = self.monitor._parse_prometheus_result(test_result, 'test_metric')
-        self.assertEqual(parsed_data['metric'], 'test_metric')
-        self.assertEqual(parsed_data['instance'], 'test-instance')
-        self.assertEqual(parsed_data['job'], 'test-job')
-        self.assertEqual(parsed_data['google_ping'], True)
-        self.assertEqual(parsed_data['google_time'], 0.1)
-        self.assertEqual(parsed_data['google_samples'], 10.0)
-
-    def test_insert_metric_success(self):
-        """Test successful metric insertion."""
+    def test_insert_ping_metrics_success(self):
+        """Test successful ping metrics insertion."""
         mock_client = MagicMock()
         self.monitor.bigquery_client = mock_client
         mock_client.insert_rows_json.return_value = []
 
-        test_metric_data = {
-            'metric': 'test_metric',
-            'value': '1.0',
-            'instance': 'test-instance',
-            'job': 'test-job'
+        test_metrics = {
+            'google_up': 1.0,
+            'apple_up': 1.0,
+            'github_up': 1.0,
+            'http_latency': 0.1
         }
 
-        self.monitor._insert_metric(test_metric_data)
+        self.monitor._insert_ping_metrics(test_metrics)
         mock_client.insert_rows_json.assert_called_once()
+        args = mock_client.insert_rows_json.call_args[0]
+        self.assertEqual(args[0], f"{BIGQUERY_PROJECT}.{BIGQUERY_DATASET}.{PING_TABLE}")
 
-    def test_insert_metric_failure(self):
-        """Test failed metric insertion."""
+    def test_insert_speed_metrics_success(self):
+        """Test successful speed metrics insertion."""
         mock_client = MagicMock()
         self.monitor.bigquery_client = mock_client
-        mock_client.insert_rows_json.side_effect = Exception("Insertion error")
+        mock_client.insert_rows_json.return_value = []
 
-        test_metric_data = {
-            'metric': 'test_metric',
-            'value': '1.0',
-            'instance': 'test-instance',
-            'job': 'test-job'
+        test_metrics = {
+            'download_mbps': 291.0,
+            'upload_mbps': 336.0,
+            'ping_ms': 1.3,
+            'jitter_ms': 0.3
         }
 
-        self.monitor._insert_metric(test_metric_data)
-        # Should not raise exception, just log error
+        self.monitor._insert_speed_metrics(test_metrics)
+        mock_client.insert_rows_json.assert_called_once()
+        args = mock_client.insert_rows_json.call_args[0]
+        self.assertEqual(args[0], f"{BIGQUERY_PROJECT}.{BIGQUERY_DATASET}.{SPEED_TABLE}")
 
-    def test_collect_metrics(self):
-        """Test collecting all metrics."""
+    def test_collect_ping_metrics(self):
+        """Test collecting ping metrics."""
         # Mock successful Prometheus queries
         mock_response = MagicMock()
         mock_response.json.return_value = {
@@ -177,11 +160,60 @@ class TestNetworkMonitor(unittest.TestCase):
         self.monitor.bigquery_client = mock_client
         mock_client.insert_rows_json.return_value = []
 
-        self.monitor.collect_metrics()
+        self.monitor.collect_ping_metrics()
         
-        # Verify that insert_rows_json was called for each metric
-        expected_calls = len(METRICS) + 1  # +1 for the 'up' metric
-        self.assertEqual(mock_client.insert_rows_json.call_count, expected_calls)
+        # Verify that insert_rows_json was called
+        mock_client.insert_rows_json.assert_called_once()
+        args = mock_client.insert_rows_json.call_args[0]
+        self.assertEqual(args[0], f"{BIGQUERY_PROJECT}.{BIGQUERY_DATASET}.{PING_TABLE}")
+
+    def test_collect_speed_metrics_with_data(self):
+        """Test collecting speed metrics when data is available."""
+        # Mock successful speedtest data
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            'data': {
+                'result': [{
+                    'metric': {'instance': 'speedtest:9798'},
+                    'value': ['1234567890', '291000000']  # 291 Mbps in bits
+                }]
+            }
+        }
+        mock_response.raise_for_status.return_value = None
+        requests.get.return_value = mock_response
+
+        # Mock successful BigQuery insertion
+        mock_client = MagicMock()
+        self.monitor.bigquery_client = mock_client
+        mock_client.insert_rows_json.return_value = []
+
+        self.monitor.collect_speed_metrics()
+        
+        # Verify that insert_rows_json was called
+        mock_client.insert_rows_json.assert_called_once()
+        args = mock_client.insert_rows_json.call_args[0]
+        self.assertEqual(args[0], f"{BIGQUERY_PROJECT}.{BIGQUERY_DATASET}.{SPEED_TABLE}")
+
+    def test_collect_speed_metrics_no_data(self):
+        """Test collecting speed metrics when no data is available."""
+        # Mock no speedtest data
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            'data': {
+                'result': []
+            }
+        }
+        mock_response.raise_for_status.return_value = None
+        requests.get.return_value = mock_response
+
+        # Mock BigQuery client
+        mock_client = MagicMock()
+        self.monitor.bigquery_client = mock_client
+
+        self.monitor.collect_speed_metrics()
+        
+        # Verify that insert_rows_json was not called
+        mock_client.insert_rows_json.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main() 
