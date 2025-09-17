@@ -8,6 +8,7 @@ import requests
 from datetime import datetime
 from google.cloud import bigquery
 from google.oauth2 import service_account
+import database
 
 # Configure logging
 logging.basicConfig(
@@ -86,47 +87,103 @@ class NetworkMonitor:
             logger.error(f"Failed to query Prometheus: {e}")
             return None
 
-    def _insert_ping_metrics(self, metrics_data):
-        """Insert ping metrics into BigQuery."""
+    def _mass_upload_metrics(self):
+        """Upload all cached metrics from SQLite to BigQuery."""
         try:
-            row = {
-                'timestamp': datetime.utcnow().isoformat(),
-                'site_id': self.site_id,
-                'location': self.location,
-                **metrics_data
-            }
+            # Get all ping metrics from SQLite
+            ping_metrics = database.get_all_ping_metrics()
+            ping_metric_rows = []
             
-            table_id = f"{BIGQUERY_PROJECT}.{BIGQUERY_DATASET}.{PING_TABLE}"
-            errors = self.bigquery_client.insert_rows_json(table_id, [row])
+            for metric in ping_metrics:
+                row = {
+                    'timestamp': metric['timestamp'],
+                    'site_id': metric['site_id'],
+                    'location': metric['location'],
+                    'google_up': metric['google_up'],
+                    'apple_up': metric['apple_up'],
+                    'github_up': metric['github_up'],
+                    'pihole_up': metric['pihole_up'],
+                    'node_up': metric['node_up'],
+                    'speedtest_up': metric['speedtest_up'],
+                    'http_latency': metric['http_latency'],
+                    'http_samples': metric['http_samples'],
+                    'http_time': metric['http_time'],
+                    'http_content_length': metric['http_content_length'],
+                    'http_duration': metric['http_duration']
+                }
+                ping_metric_rows.append(row)
             
-            if errors:
-                logger.error(f"Failed to insert ping metrics: {errors}")
-            else:
-                logger.info("Successfully inserted ping metrics")
-                
+            # Insert ping metrics into BigQuery
+            if ping_metric_rows:
+                table_id = f"{BIGQUERY_PROJECT}.{BIGQUERY_DATASET}.{PING_TABLE}"
+                errors = self.bigquery_client.insert_rows_json(table_id, ping_metric_rows)
+                if errors:
+                    logger.error(f"Failed to insert ping metrics: {errors}")
+                else:
+                    logger.info(f"Successfully inserted {len(ping_metric_rows)} ping metrics into BigQuery")
+                    # Clear the uploaded metrics from SQLite
+                    database.clear_ping_metrics()
+            
+            # Get all speed metrics from SQLite
+            speed_metrics = database.get_all_speed_metrics()
+            speed_metric_rows = []
+            
+            for metric in speed_metrics:
+                row = {
+                    'timestamp': metric['timestamp'],
+                    'site_id': metric['site_id'],
+                    'location': metric['location'],
+                    'download_mbps': metric['download_mbps'],
+                    'upload_mbps': metric['upload_mbps'],
+                    'ping_ms': metric['ping_ms'],
+                    'jitter_ms': metric['jitter_ms']
+                }
+                speed_metric_rows.append(row)
+            
+            # Insert speed metrics into BigQuery
+            if speed_metric_rows:
+                table_id = f"{BIGQUERY_PROJECT}.{BIGQUERY_DATASET}.{SPEED_TABLE}"
+                errors = self.bigquery_client.insert_rows_json(table_id, speed_metric_rows)
+                if errors:
+                    logger.error(f"Failed to insert speed metrics: {errors}")
+                else:
+                    logger.info(f"Successfully inserted {len(speed_metric_rows)} speed metrics into BigQuery")
+                    # Clear the uploaded metrics from SQLite
+                    database.clear_speed_metrics()
+                    
         except Exception as e:
-            logger.error(f"Error inserting ping metrics: {e}")
+            logger.error(f"Error uploading metrics to BigQuery: {e}")
+
+    def _insert_ping_metrics(self, metrics_data):
+        """Insert ping metrics into SQLite database."""
+        try:
+            # Add site_id and location to metrics_data
+            metrics_data['site_id'] = self.site_id
+            metrics_data['location'] = self.location
+            
+            # Insert into SQLite database
+            database.insert_ping_metrics(metrics_data)
+            logger.info("Successfully inserted ping metrics into SQLite")
+        except Exception as e:
+            logger.error(f"Error inserting ping metrics into SQLite: {e}")
 
     def _insert_speed_metrics(self, metrics_data):
-        """Insert speedtest metrics into BigQuery."""
+        """Insert speedtest metrics into SQLite database."""
         try:
-            row = {
-                'timestamp': datetime.utcnow().isoformat(),
-                'site_id': self.site_id,
-                'location': self.location,
-                **metrics_data
-            }
+            # Add site_id and location to metrics_data
+            metrics_data['site_id'] = self.site_id
+            metrics_data['location'] = self.location
             
-            table_id = f"{BIGQUERY_PROJECT}.{BIGQUERY_DATASET}.{SPEED_TABLE}"
-            errors = self.bigquery_client.insert_rows_json(table_id, [row])
-            
-            if errors:
-                logger.error(f"Failed to insert speed metrics: {errors}")
-            else:
-                logger.info("Successfully inserted speed metrics")
-                
+            # Insert into SQLite database
+            database.insert_speed_metrics(metrics_data)
+            logger.info("Successfully inserted speed metrics into SQLite")
         except Exception as e:
-            logger.error(f"Error inserting speed metrics: {e}")
+            logger.error(f"Error inserting speed metrics into SQLite: {e}")
+
+    def upload_metrics(self):
+        """Collect and upload metrics."""
+        logger.info("Uploading metrics...")
+        self._mass_upload_metrics()
 
     def collect_ping_metrics(self):
         """Collect and store ping metrics."""
@@ -171,6 +228,9 @@ class NetworkMonitor:
             self._insert_speed_metrics(metrics_data)
 
 def main():
+    # Initialize the database
+    database.init_db()
+    
     monitor = NetworkMonitor()
     
     # Schedule ping metrics collection every 5 minutes
@@ -183,6 +243,9 @@ def main():
     # Run initial collection
     monitor.collect_ping_metrics()
     monitor.collect_speed_metrics()
+    
+    # Schedule metrics upload every 24 hours
+    schedule.every(1440).minutes.do(monitor.upload_metrics)
     
     # Keep the script running
     while True:

@@ -1,0 +1,12 @@
+# update documentation on how to name your device 
+https://github.com/roguisharcanetrickster/internet-pi
+
+# setup on local devices to test
+
+
+# push regulator feature:
+https://github.com/roguisharcanetrickster/custom-metrics 
+stash metrics locally, 
+store timestamp of collected metric, 
+
+push them on a schedule, when has 24 hours worth of info AND hasn't tried push for X time
