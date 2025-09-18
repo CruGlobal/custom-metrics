@@ -10,7 +10,7 @@ on:
 jobs:
   call-tests:
     name: Test
-    uses: ./.github/workflows/tests.yml@master
+    uses: ./.github/workflows/tests.yml
 
   build:
     needs: call-tests
