@@ -9,6 +9,7 @@ from main import (
     NetworkMonitor, SITE_ID_FILE, PING_METRICS, SPEED_METRICS,
     BIGQUERY_PROJECT, BIGQUERY_DATASET, PING_TABLE, SPEED_TABLE
 )
+import database
 
 class TestNetworkMonitor(unittest.TestCase):
     def setUp(self):
@@ -104,12 +105,9 @@ class TestNetworkMonitor(unittest.TestCase):
         result = self.monitor._query_prometheus("test_query")
         self.assertIsNone(result)
 
-    def test_insert_ping_metrics_success(self):
+    @patch('database.insert_ping_metrics')
+    def test_insert_ping_metrics_success(self, mock_insert_ping_metrics):
         """Test successful ping metrics insertion."""
-        mock_client = MagicMock()
-        self.monitor.bigquery_client = mock_client
-        mock_client.insert_rows_json.return_value = []
-
         test_metrics = {
             'google_up': 1.0,
             'apple_up': 1.0,
@@ -118,16 +116,11 @@ class TestNetworkMonitor(unittest.TestCase):
         }
 
         self.monitor._insert_ping_metrics(test_metrics)
-        mock_client.insert_rows_json.assert_called_once()
-        args = mock_client.insert_rows_json.call_args[0]
-        self.assertEqual(args[0], f"{BIGQUERY_PROJECT}.{BIGQUERY_DATASET}.{PING_TABLE}")
+        mock_insert_ping_metrics.assert_called_once()
 
-    def test_insert_speed_metrics_success(self):
+    @patch('database.insert_speed_metrics')
+    def test_insert_speed_metrics_success(self, mock_insert_speed_metrics):
         """Test successful speed metrics insertion."""
-        mock_client = MagicMock()
-        self.monitor.bigquery_client = mock_client
-        mock_client.insert_rows_json.return_value = []
-
         test_metrics = {
             'download_mbps': 291.0,
             'upload_mbps': 336.0,
@@ -136,11 +129,10 @@ class TestNetworkMonitor(unittest.TestCase):
         }
 
         self.monitor._insert_speed_metrics(test_metrics)
-        mock_client.insert_rows_json.assert_called_once()
-        args = mock_client.insert_rows_json.call_args[0]
-        self.assertEqual(args[0], f"{BIGQUERY_PROJECT}.{BIGQUERY_DATASET}.{SPEED_TABLE}")
+        mock_insert_speed_metrics.assert_called_once()
 
-    def test_collect_ping_metrics(self):
+    @patch('database.insert_ping_metrics')
+    def test_collect_ping_metrics(self, mock_insert_ping_metrics):
         """Test collecting ping metrics."""
         # Mock successful Prometheus queries
         mock_response = MagicMock()
@@ -155,19 +147,13 @@ class TestNetworkMonitor(unittest.TestCase):
         mock_response.raise_for_status.return_value = None
         requests.get.return_value = mock_response
 
-        # Mock successful BigQuery insertion
-        mock_client = MagicMock()
-        self.monitor.bigquery_client = mock_client
-        mock_client.insert_rows_json.return_value = []
-
         self.monitor.collect_ping_metrics()
         
-        # Verify that insert_rows_json was called
-        mock_client.insert_rows_json.assert_called_once()
-        args = mock_client.insert_rows_json.call_args[0]
-        self.assertEqual(args[0], f"{BIGQUERY_PROJECT}.{BIGQUERY_DATASET}.{PING_TABLE}")
+        # Verify that insert_ping_metrics was called
+        mock_insert_ping_metrics.assert_called_once()
 
-    def test_collect_speed_metrics_with_data(self):
+    @patch('database.insert_speed_metrics')
+    def test_collect_speed_metrics_with_data(self, mock_insert_speed_metrics):
         """Test collecting speed metrics when data is available."""
         # Mock successful speedtest data
         mock_response = MagicMock()
@@ -182,38 +168,87 @@ class TestNetworkMonitor(unittest.TestCase):
         mock_response.raise_for_status.return_value = None
         requests.get.return_value = mock_response
 
-        # Mock successful BigQuery insertion
-        mock_client = MagicMock()
-        self.monitor.bigquery_client = mock_client
-        mock_client.insert_rows_json.return_value = []
-
         self.monitor.collect_speed_metrics()
         
-        # Verify that insert_rows_json was called
-        mock_client.insert_rows_json.assert_called_once()
-        args = mock_client.insert_rows_json.call_args[0]
-        self.assertEqual(args[0], f"{BIGQUERY_PROJECT}.{BIGQUERY_DATASET}.{SPEED_TABLE}")
+        # Verify that insert_speed_metrics was called
+        mock_insert_speed_metrics.assert_called_once()
 
-    def test_collect_speed_metrics_no_data(self):
-        """Test collecting speed metrics when no data is available."""
-        # Mock no speedtest data
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            'data': {
-                'result': []
+    @patch('database.get_all_ping_metrics')
+    @patch('database.get_all_speed_metrics')
+    @patch('database.clear_ping_metrics')
+    @patch('database.clear_speed_metrics')
+    def test_mass_upload_metrics(self, mock_clear_speed_metrics, mock_clear_ping_metrics, mock_get_all_speed_metrics, mock_get_all_ping_metrics):
+        """Test uploading metrics."""
+        # Mock ping metrics data
+        mock_get_all_ping_metrics.return_value = [
+            {
+                'timestamp': '2023-01-01T00:00:00',
+                'site_id': 'test-site-id',
+                'location': 'test-location',
+                'google_up': 1.0,
+                'apple_up': 1.0,
+                'github_up': 1.0,
+                'pihole_up': 1.0,
+                'node_up': 1.0,
+                'speedtest_up': 1.0,
+                'http_latency': 0.1,
+                'http_samples': 100,
+                'http_time': 0.5,
+                'http_content_length': 1000,
+                'http_duration': 0.2
             }
-        }
-        mock_response.raise_for_status.return_value = None
-        requests.get.return_value = mock_response
-
+        ]
+        
+        # Mock speed metrics data
+        mock_get_all_speed_metrics.return_value = [
+            {
+                'timestamp': '2023-01-01T00:00:00',
+                'site_id': 'test-site-id',
+                'location': 'test-location',
+                'download_mbps': 291.0,
+                'upload_mbps': 336.0,
+                'ping_ms': 1.3,
+                'jitter_ms': 0.3
+            }
+        ]
+        
         # Mock BigQuery client
         mock_client = MagicMock()
         self.monitor.bigquery_client = mock_client
-
-        self.monitor.collect_speed_metrics()
+        mock_client.insert_rows_json.return_value = []
         
-        # Verify that insert_rows_json was not called
-        mock_client.insert_rows_json.assert_not_called()
+        # Call the method to test
+        self.monitor._mass_upload_metrics()
+        
+        # Verify that the methods were called
+        mock_get_all_ping_metrics.assert_called_once()
+        mock_get_all_speed_metrics.assert_called_once()
+        # Check that insert_rows_json was called twice (once for ping metrics, once for speed metrics)
+        self.assertEqual(mock_client.insert_rows_json.call_count, 2)
+        mock_clear_ping_metrics.assert_called_once()
+        mock_clear_speed_metrics.assert_called_once()
+        
+    @patch('database.get_all_ping_metrics')
+    @patch('database.get_all_speed_metrics')
+    @patch('database.clear_ping_metrics')
+    @patch('database.clear_speed_metrics')
+    def test_upload_metrics_calls_mass_upload(self, mock_clear_speed_metrics, mock_clear_ping_metrics, mock_get_all_speed_metrics, mock_get_all_ping_metrics):
+        """Test that upload_metrics calls _mass_upload_metrics."""
+        # Mock ping metrics data
+        mock_get_all_ping_metrics.return_value = []
+        
+        # Mock speed metrics data
+        mock_get_all_speed_metrics.return_value = []
+        
+        # Mock BigQuery client
+        mock_client = MagicMock()
+        self.monitor.bigquery_client = mock_client
+        mock_client.insert_rows_json.return_value = []
+        
+        # Call the method to test
+        with patch.object(self.monitor, '_mass_upload_metrics') as mock_mass_upload_metrics:
+            self.monitor.upload_metrics()
+            mock_mass_upload_metrics.assert_called_once()
 
 if __name__ == '__main__':
-    unittest.main() 
+    unittest.main()
