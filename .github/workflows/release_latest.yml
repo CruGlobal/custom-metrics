@@ -1,0 +1,36 @@
+name: PR Merged
+on:
+  pull_request:
+    types: [closed]
+    branches: [master]
+permissions:
+  contents: write
+jobs:
+  call-tests:
+    name: Test
+    uses: ./.github/workflows/tests.yml
+
+  call-bump-version:
+    name: Version
+    # Only run if tests pass
+    needs: [call-tests]
+    uses: ./.github/workflows/bump-version.yml
+    with:
+      ref: ${{ github.ref }}
+      pre_release: ${{ github.base_ref == 'develop' && 'dev' || '' }}
+
+  call-docker-build:
+    name: Build
+    uses: CruGlobal/.github/.github/workflows/docker-build.yml@main
+    needs: [call-bump-version]
+    secrets:
+      DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+    with:
+      platforms: linux/arm/v8,linux/amd64,linux/arm64
+      base_tag: ${{ github.base_ref }}
+      # tags: ${{ github.base_ref }},${{ needs.call-bump-version.outputs.new_version }}
+      tags: ${{ github.base_ref }},"master"
+      # build-args: |
+      #   BUILDPLATFORM=linux/arm/v8
+      #   TARGETPLATFORM=linux/arm/v8
