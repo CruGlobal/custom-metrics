@@ -12,19 +12,19 @@ jobs:
     name: Test
     uses: ./.github/workflows/tests.yml
 
-  call-bump-version:
-    name: Version
-    # Only run if tests pass
-    needs: [call-tests]
-    uses: ./.github/workflows/bump-version.yml
-    with:
-      ref: ${{ github.ref }}
-      pre_release: ${{ github.base_ref == 'develop' && 'dev' || '' }}
+  # call-bump-version:
+  #   name: Version
+  #   # Only run if tests pass
+  #   needs: [call-tests]
+  #   uses: ./.github/workflows/bump-version.yml
+  #   with:
+  #     ref: ${{ github.ref }}
+  #     pre_release: ${{ github.base_ref == 'develop' && 'dev' || '' }}
 
   call-docker-build:
     name: Build
     uses: CruGlobal/.github/.github/workflows/docker-build.yml@main
-    needs: [call-bump-version]
+    # needs: [call-bump-version]
     secrets:
       DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
