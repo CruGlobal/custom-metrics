@@ -25,7 +25,7 @@ jobs:
     name: Build
     uses: ./.github/workflows/docker_build_push.yml
     secrets:
-      DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
     with:
       # platforms: linux/arm/v8,linux/amd64,linux/arm64
