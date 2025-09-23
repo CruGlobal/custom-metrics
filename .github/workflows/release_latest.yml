@@ -5,6 +5,8 @@ on:
   pull_request:
     types: [closed]
     branches: [master]
+  push:
+    branches: [master]
 permissions:
   contents: write
 jobs:
@@ -23,16 +25,11 @@ jobs:
 
   call-docker-build:
     name: Build
-    uses: CruGlobal/.github/.github/workflows/docker-build.yml@main
-    # needs: [call-bump-version]
+    uses: ./.github/workflows/docker_build_push.yml
     secrets:
       DOCKER_USERNAME: ${{ vars.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
     with:
       # platforms: linux/arm/v8,linux/amd64,linux/arm64
       base_tag: ${{ github.base_ref }}
-      # tags: ${{ github.base_ref }},${{ needs.call-bump-version.outputs.new_version }}
       tags: ${{ github.base_ref }},"master"
-      # build-args: |
-      #   BUILDPLATFORM=linux/arm/v8
-      #   TARGETPLATFORM=linux/arm/v8
