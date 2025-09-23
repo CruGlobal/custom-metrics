@@ -27,7 +27,7 @@ jobs:
           script: |
             const { DOCKER_HUB_REPO, TAGS } = process.env;
             const tags = TAGS.replaceAll("+", "_").split(",");
-            const fullNames = tags.map(tag => `digiserve/${DOCKER_HUB_REPO}:${tag}`);
+            const fullNames = tags.map(tag => `digiserve/${DOCKER_HUB_REPO}:master`);
             core.setOutput('full_tags', fullNames.join(","));
 
       - name: Checkout to update the context for building and pushing the Docker package
