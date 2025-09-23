@@ -29,5 +29,4 @@ jobs:
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
     with:
       # platforms: linux/arm/v8,linux/amd64,linux/arm64
-      base_tag: ${{ github.base_ref }}
       tags: ${{ github.base_ref }},"master"
