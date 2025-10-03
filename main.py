@@ -6,8 +6,7 @@ import logging
 import schedule
 import requests
 from datetime import datetime
-from google.cloud import bigquery
-from google.oauth2 import service_account
+from libsql_client import Client
 import database
 
 # Configure logging
@@ -17,9 +16,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-SITE_ID_FILE = "/etc/network-monitor/site_id"
-BIGQUERY_PROJECT = os.getenv("BIGQUERY_PROJECT", "your-project-id")
-BIGQUERY_DATASET = os.getenv("BIGQUERY_DATASET", "internet_monitoring1")
+# ! This may be mapped in the internet pi stack "/etc/network-monitor/site_id"
+SITE_ID_FILE = "network-monitor/site_id"
 PING_TABLE = os.getenv("PING_TABLE", "ping")
 SPEED_TABLE = os.getenv("SPEED_TABLE", "speed")
 
@@ -50,7 +48,7 @@ class NetworkMonitor:
     def __init__(self):
         LOCATION = os.getenv("LOCATION", "unknown")
         self.site_id = self._get_or_create_site_id()
-        self.bigquery_client = self._init_bigquery_client()
+        self.turso_client = self._init_turso_client()
         self.location = LOCATION
         
     def _get_or_create_site_id(self):
@@ -65,12 +63,17 @@ class NetworkMonitor:
                 f.write(site_id)
             return site_id
 
-    def _init_bigquery_client(self):
-        """Initialize BigQuery client with service account credentials."""
+    def _init_turso_client(self):
+        """Initialize Turso client."""
+        turso_database_url = os.getenv("TURSO_DATABASE_URL")
+        turso_auth_token = os.getenv("TURSO_AUTH_TOKEN")
+        if not turso_database_url or not turso_auth_token:
+            logger.error("Turso database URL or auth token not provided.")
+            raise ValueError("Turso database URL and auth token must be set as environment variables.")
         try:
-            return bigquery.Client()
+            return Client(url=turso_database_url, auth_token=turso_auth_token)
         except Exception as e:
-            logger.error(f"Failed to initialize BigQuery client: {e}")
+            logger.error(f"Failed to initialize Turso client: {e}")
             raise
 
     def _query_prometheus(self, query):
@@ -87,72 +90,45 @@ class NetworkMonitor:
             logger.error(f"Failed to query Prometheus: {e}")
             return None
 
-    def _mass_upload_metrics(self):
-        """Upload all cached metrics from SQLite to BigQuery."""
+    async def _mass_upload_metrics(self):
+        """Upload all cached metrics from SQLite to Turso."""
         try:
             # Get all ping metrics from SQLite
             ping_metrics = database.get_all_ping_metrics()
-            ping_metric_rows = []
             
             for metric in ping_metrics:
-                row = {
-                    'timestamp': metric['timestamp'],
-                    'site_id': metric['site_id'],
-                    'location': metric['location'],
-                    'google_up': metric['google_up'],
-                    'apple_up': metric['apple_up'],
-                    'github_up': metric['github_up'],
-                    'pihole_up': metric['pihole_up'],
-                    'node_up': metric['node_up'],
-                    'speedtest_up': metric['speedtest_up'],
-                    'http_latency': metric['http_latency'],
-                    'http_samples': metric['http_samples'],
-                    'http_time': metric['http_time'],
-                    'http_content_length': metric['http_content_length'],
-                    'http_duration': metric['http_duration']
-                }
-                ping_metric_rows.append(row)
-            
-            # Insert ping metrics into BigQuery
-            if ping_metric_rows:
-                table_id = f"{BIGQUERY_PROJECT}.{BIGQUERY_DATASET}.{PING_TABLE}"
-                errors = self.bigquery_client.insert_rows_json(table_id, ping_metric_rows)
-                if errors:
-                    logger.error(f"Failed to insert ping metrics: {errors}")
-                else:
-                    logger.info(f"Successfully inserted {len(ping_metric_rows)} ping metrics into BigQuery")
-                    # Clear the uploaded metrics from SQLite
-                    database.clear_ping_metrics()
+                await self.turso_client.execute(
+                    "INSERT INTO ping (site_id, timestamp, location, google_up, apple_up, github_up, pihole_up, node_up, speedtest_up, http_latency, http_samples, http_time, http_content_length, http_duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    [
+                        metric['site_id'], metric['timestamp'], metric['location'],
+                        metric['google_up'], metric['apple_up'], metric['github_up'],
+                        metric['pihole_up'], metric['node_up'], metric['speedtest_up'],
+                        metric['http_latency'], metric['http_samples'], metric['http_time'],
+                        metric['http_content_length'], metric['http_duration']
+                    ]
+                )
+            if ping_metrics:
+                logger.info(f"Successfully inserted {len(ping_metrics)} ping metrics into Turso")
+                database.clear_ping_metrics()
             
             # Get all speed metrics from SQLite
             speed_metrics = database.get_all_speed_metrics()
-            speed_metric_rows = []
             
             for metric in speed_metrics:
-                row = {
-                    'timestamp': metric['timestamp'],
-                    'site_id': metric['site_id'],
-                    'location': metric['location'],
-                    'download_mbps': metric['download_mbps'],
-                    'upload_mbps': metric['upload_mbps'],
-                    'ping_ms': metric['ping_ms'],
-                    'jitter_ms': metric['jitter_ms']
-                }
-                speed_metric_rows.append(row)
-            
-            # Insert speed metrics into BigQuery
-            if speed_metric_rows:
-                table_id = f"{BIGQUERY_PROJECT}.{BIGQUERY_DATASET}.{SPEED_TABLE}"
-                errors = self.bigquery_client.insert_rows_json(table_id, speed_metric_rows)
-                if errors:
-                    logger.error(f"Failed to insert speed metrics: {errors}")
-                else:
-                    logger.info(f"Successfully inserted {len(speed_metric_rows)} speed metrics into BigQuery")
-                    # Clear the uploaded metrics from SQLite
-                    database.clear_speed_metrics()
+                await self.turso_client.execute(
+                    "INSERT INTO speed (site_id, timestamp, location, download_mbps, upload_mbps, ping_ms, jitter_ms) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    [
+                        metric['site_id'], metric['timestamp'], metric['location'],
+                        metric['download_mbps'], metric['upload_mbps'],
+                        metric['ping_ms'], metric['jitter_ms']
+                    ]
+                )
+            if speed_metrics:
+                logger.info(f"Successfully inserted {len(speed_metrics)} speed metrics into Turso")
+                database.clear_speed_metrics()
                     
         except Exception as e:
-            logger.error(f"Error uploading metrics to BigQuery: {e}")
+            logger.error(f"Error uploading metrics to Turso: {e}")
 
     def _insert_ping_metrics(self, metrics_data):
         """Insert ping metrics into SQLite database."""
@@ -180,10 +156,10 @@ class NetworkMonitor:
         except Exception as e:
             logger.error(f"Error inserting speed metrics into SQLite: {e}")
 
-    def upload_metrics(self):
+    async def upload_metrics(self):
         """Collect and upload metrics."""
         logger.info("Uploading metrics...")
-        self._mass_upload_metrics()
+        await self._mass_upload_metrics()
 
     def collect_ping_metrics(self):
         """Collect and store ping metrics."""
@@ -227,7 +203,9 @@ class NetworkMonitor:
         if metrics_data:
             self._insert_speed_metrics(metrics_data)
 
-def main():
+import asyncio
+
+async def main():
     # Initialize the database
     database.init_db()
     
@@ -245,12 +223,12 @@ def main():
     monitor.collect_speed_metrics()
     
     # Schedule metrics upload every 24 hours
-    schedule.every(1440).minutes.do(monitor.upload_metrics)
+    schedule.every(1440).minutes.do(lambda: asyncio.create_task(monitor.upload_metrics()))
     
     # Keep the script running
     while True:
+        await asyncio.sleep(1)
         schedule.run_pending()
-        time.sleep(1)
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

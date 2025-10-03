@@ -7,9 +7,10 @@ from datetime import datetime
 import main
 from main import (
     NetworkMonitor, SITE_ID_FILE, PING_METRICS, SPEED_METRICS,
-    BIGQUERY_PROJECT, BIGQUERY_DATASET, PING_TABLE, SPEED_TABLE
+    PING_TABLE, SPEED_TABLE
 )
 import database
+import asyncio
 
 class TestNetworkMonitor(unittest.TestCase):
     def setUp(self):
@@ -24,8 +25,10 @@ class TestNetworkMonitor(unittest.TestCase):
         self.open_patcher = patch('builtins.open', mock_open())
         self.mock_open = self.open_patcher.start()
 
-        self.bigquery_client_patcher = patch('main.bigquery.Client')
-        self.bigquery_client_patcher.start()
+        self.turso_client_patcher = patch('main.Client')
+        self.mock_turso_client_class = self.turso_client_patcher.start()
+        self.mock_turso_client = MagicMock()
+        self.mock_turso_client_class.return_value = self.mock_turso_client
 
         self.requests_get_patcher = patch('main.requests.get')
         self.requests_get_patcher.start()
@@ -33,8 +36,8 @@ class TestNetworkMonitor(unittest.TestCase):
         self.getenv_patcher = patch('main.os.getenv')
         self.mock_getenv = self.getenv_patcher.start()
         self.mock_getenv.side_effect = lambda key, default=None: {
-            'BIGQUERY_PROJECT': 'test-project',
-            'BIGQUERY_DATASET': 'test-dataset',
+            'TURSO_DATABASE_URL': 'libsql://test.turso.io',
+            'TURSO_AUTH_TOKEN': 'test-token',
             'PING_TABLE': 'test-ping',
             'SPEED_TABLE': 'test-speed',
             'PROMETHEUS_URL': 'http://test-prometheus:9090',
@@ -51,7 +54,7 @@ class TestNetworkMonitor(unittest.TestCase):
         self.site_id_file_patcher.stop()
         self.path_exists_patcher.stop()
         self.open_patcher.stop()
-        self.bigquery_client_patcher.stop()
+        self.turso_client_patcher.stop()
         self.requests_get_patcher.stop()
         self.getenv_patcher.stop()
         self.makedirs_patcher.stop()
@@ -177,7 +180,7 @@ class TestNetworkMonitor(unittest.TestCase):
     @patch('database.get_all_speed_metrics')
     @patch('database.clear_ping_metrics')
     @patch('database.clear_speed_metrics')
-    def test_mass_upload_metrics(self, mock_clear_speed_metrics, mock_clear_ping_metrics, mock_get_all_speed_metrics, mock_get_all_ping_metrics):
+    async def test_mass_upload_metrics(self, mock_clear_speed_metrics, mock_clear_ping_metrics, mock_get_all_speed_metrics, mock_get_all_ping_metrics):
         """Test uploading metrics."""
         # Mock ping metrics data
         mock_get_all_ping_metrics.return_value = [
@@ -212,19 +215,30 @@ class TestNetworkMonitor(unittest.TestCase):
             }
         ]
         
-        # Mock BigQuery client
-        mock_client = MagicMock()
-        self.monitor.bigquery_client = mock_client
-        mock_client.insert_rows_json.return_value = []
-        
         # Call the method to test
-        self.monitor._mass_upload_metrics()
+        await self.monitor._mass_upload_metrics()
         
         # Verify that the methods were called
         mock_get_all_ping_metrics.assert_called_once()
         mock_get_all_speed_metrics.assert_called_once()
-        # Check that insert_rows_json was called twice (once for ping metrics, once for speed metrics)
-        self.assertEqual(mock_client.insert_rows_json.call_count, 2)
+        
+        # Verify Turso client execute was called twice
+        self.assertEqual(self.mock_turso_client.execute.call_count, 2)
+        
+        # Assert the SQL queries and parameters for ping metrics
+        ping_call_args = self.mock_turso_client.execute.call_args_list[0]
+        self.assertIn("INSERT INTO test-ping", ping_call_args.args[0])
+        self.assertIn("VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", ping_call_args.args[0])
+        self.assertEqual(ping_call_args.args[1][0], 'test-site-id')
+        self.assertEqual(ping_call_args.args[1][1], '2023-01-01T00:00:00')
+        
+        # Assert the SQL queries and parameters for speed metrics
+        speed_call_args = self.mock_turso_client.execute.call_args_list[1]
+        self.assertIn("INSERT INTO test-speed", speed_call_args.args[0])
+        self.assertIn("VALUES (?, ?, ?, ?, ?, ?, ?)", speed_call_args.args[0])
+        self.assertEqual(speed_call_args.args[1][0], 'test-site-id')
+        self.assertEqual(speed_call_args.args[1][1], '2023-01-01T00:00:00')
+
         mock_clear_ping_metrics.assert_called_once()
         mock_clear_speed_metrics.assert_called_once()
         
@@ -232,7 +246,7 @@ class TestNetworkMonitor(unittest.TestCase):
     @patch('database.get_all_speed_metrics')
     @patch('database.clear_ping_metrics')
     @patch('database.clear_speed_metrics')
-    def test_upload_metrics_calls_mass_upload(self, mock_clear_speed_metrics, mock_clear_ping_metrics, mock_get_all_speed_metrics, mock_get_all_ping_metrics):
+    async def test_upload_metrics_calls_mass_upload(self, mock_clear_speed_metrics, mock_clear_ping_metrics, mock_get_all_speed_metrics, mock_get_all_ping_metrics):
         """Test that upload_metrics calls _mass_upload_metrics."""
         # Mock ping metrics data
         mock_get_all_ping_metrics.return_value = []
@@ -240,14 +254,9 @@ class TestNetworkMonitor(unittest.TestCase):
         # Mock speed metrics data
         mock_get_all_speed_metrics.return_value = []
         
-        # Mock BigQuery client
-        mock_client = MagicMock()
-        self.monitor.bigquery_client = mock_client
-        mock_client.insert_rows_json.return_value = []
-        
         # Call the method to test
         with patch.object(self.monitor, '_mass_upload_metrics') as mock_mass_upload_metrics:
-            self.monitor.upload_metrics()
+            await self.monitor.upload_metrics()
             mock_mass_upload_metrics.assert_called_once()
 
 if __name__ == '__main__':
