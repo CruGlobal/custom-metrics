@@ -25,10 +25,10 @@ class TestNetworkMonitor(unittest.TestCase):
         self.open_patcher = patch('builtins.open', mock_open())
         self.mock_open = self.open_patcher.start()
 
-        self.turso_client_patcher = patch('main.Client')
-        self.mock_turso_client_class = self.turso_client_patcher.start()
+        self.turso_client_patcher = patch('main.create_client')
+        self.mock_create_client = self.turso_client_patcher.start()
         self.mock_turso_client = MagicMock()
-        self.mock_turso_client_class.return_value = self.mock_turso_client
+        self.mock_create_client.return_value = self.mock_turso_client
 
         self.requests_get_patcher = patch('main.requests.get')
         self.requests_get_patcher.start()
@@ -47,8 +47,8 @@ class TestNetworkMonitor(unittest.TestCase):
         self.makedirs_patcher = patch('main.os.makedirs')
         self.makedirs_patcher.start()
 
-        # Create instance of NetworkMonitor
-        self.monitor = NetworkMonitor()
+        # self.monitor will be created in individual tests where needed
+        self.monitor = None
 
     def tearDown(self):
         self.site_id_file_patcher.stop()
@@ -61,6 +61,7 @@ class TestNetworkMonitor(unittest.TestCase):
 
     def test_smoke(self):
         """Basic smoke test to verify test infrastructure."""
+        self.monitor = NetworkMonitor() # Initialize monitor for this test
         self.assertTrue(True)
         self.assertEqual(1 + 1, 2)
         self.assertIsNotNone(self.monitor)
@@ -75,6 +76,7 @@ class TestNetworkMonitor(unittest.TestCase):
         with patch('builtins.open', mock_open(read_data=test_site_id)):
             monitor = NetworkMonitor()
             self.assertEqual(monitor.site_id, test_site_id)
+        self.mock_create_client.reset_mock() # Clear mock calls from NetworkMonitor() in this test
 
     def test_get_or_create_site_id_new(self):
         """Test creating new site ID."""
@@ -84,6 +86,7 @@ class TestNetworkMonitor(unittest.TestCase):
             monitor = NetworkMonitor()
             mock_file.assert_called_with('/tmp/test_site_id', 'w')
             self.assertIsNotNone(monitor.site_id)
+        self.mock_create_client.reset_mock() # Clear mock calls from NetworkMonitor() in this test
 
     def test_query_prometheus_success(self):
         """Test successful Prometheus query."""
@@ -99,12 +102,14 @@ class TestNetworkMonitor(unittest.TestCase):
         mock_response.raise_for_status.return_value = None
         requests.get.return_value = mock_response
 
+        self.monitor = NetworkMonitor() # Initialize monitor for this test
         result = self.monitor._query_prometheus("test_query")
         self.assertEqual(result, mock_response.json.return_value)
 
     def test_query_prometheus_failure(self):
         """Test failed Prometheus query."""
         requests.get.side_effect = Exception("Connection error")
+        self.monitor = NetworkMonitor() # Initialize monitor for this test
         result = self.monitor._query_prometheus("test_query")
         self.assertIsNone(result)
 
@@ -118,6 +123,7 @@ class TestNetworkMonitor(unittest.TestCase):
             'http_latency': 0.1
         }
 
+        self.monitor = NetworkMonitor() # Initialize monitor for this test
         self.monitor._insert_ping_metrics(test_metrics)
         mock_insert_ping_metrics.assert_called_once()
 
@@ -131,6 +137,7 @@ class TestNetworkMonitor(unittest.TestCase):
             'jitter_ms': 0.3
         }
 
+        self.monitor = NetworkMonitor() # Initialize monitor for this test
         self.monitor._insert_speed_metrics(test_metrics)
         mock_insert_speed_metrics.assert_called_once()
 
@@ -150,6 +157,7 @@ class TestNetworkMonitor(unittest.TestCase):
         mock_response.raise_for_status.return_value = None
         requests.get.return_value = mock_response
 
+        self.monitor = NetworkMonitor() # Initialize monitor for this test
         self.monitor.collect_ping_metrics()
         
         # Verify that insert_ping_metrics was called
@@ -171,6 +179,7 @@ class TestNetworkMonitor(unittest.TestCase):
         mock_response.raise_for_status.return_value = None
         requests.get.return_value = mock_response
 
+        self.monitor = NetworkMonitor() # Initialize monitor for this test
         self.monitor.collect_speed_metrics()
         
         # Verify that insert_speed_metrics was called
@@ -216,13 +225,15 @@ class TestNetworkMonitor(unittest.TestCase):
         ]
         
         # Call the method to test
-        await self.monitor._mass_upload_metrics()
+        self.monitor = NetworkMonitor() # Initialize monitor for this test
+        asyncio.run(self.monitor._mass_upload_metrics())
         
         # Verify that the methods were called
         mock_get_all_ping_metrics.assert_called_once()
         mock_get_all_speed_metrics.assert_called_once()
         
         # Verify Turso client execute was called twice
+        self.assertEqual(self.mock_create_client.call_count, 1)
         self.assertEqual(self.mock_turso_client.execute.call_count, 2)
         
         # Assert the SQL queries and parameters for ping metrics
@@ -255,9 +266,40 @@ class TestNetworkMonitor(unittest.TestCase):
         mock_get_all_speed_metrics.return_value = []
         
         # Call the method to test
+        self.monitor = NetworkMonitor() # Initialize monitor for this test
         with patch.object(self.monitor, '_mass_upload_metrics') as mock_mass_upload_metrics:
-            await self.monitor.upload_metrics()
+            asyncio.run(self.monitor.upload_metrics())
             mock_mass_upload_metrics.assert_called_once()
+
+    def test_init_turso_client_success(self):
+        """Test successful Turso client initialization."""
+        self.mock_getenv.side_effect = lambda key, default=None: {
+            'TURSO_DATABASE_URL': 'libsql://test.turso.io',
+            'TURSO_AUTH_TOKEN': 'test-token',
+            'LOCATION': 'test-location'
+        }.get(key, default)
+        
+        self.mock_create_client.reset_mock() # Clear any previous calls
+        monitor = NetworkMonitor()
+        self.mock_create_client.assert_called_once_with(
+            url='libsql://test.turso.io',
+            auth_token='test-token'
+        )
+        self.assertEqual(monitor.turso_client, self.mock_turso_client)
+
+    def test_init_turso_client_missing_env_vars(self):
+        """Test Turso client initialization with missing environment variables."""
+        self.mock_getenv.side_effect = lambda key, default=None: {
+            'TURSO_DATABASE_URL': None,
+            'TURSO_AUTH_TOKEN': None,
+            'LOCATION': 'test-location'
+        }.get(key, default)
+        
+        self.mock_create_client.reset_mock() # Clear any previous calls
+        with self.assertRaises(ValueError) as cm:
+            NetworkMonitor()
+        self.assertIn("Turso database URL and auth token must be set as environment variables.", str(cm.exception))
+        self.mock_create_client.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main()
