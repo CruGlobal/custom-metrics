@@ -140,15 +140,6 @@ class NetworkMonitor:
                         speed_values
                     )
                     logger.info(f"Successfully inserted {len(speed_metrics)} speed metrics into Turso using batch insert.")
-                    database.clear_speed_metrics()
-                    
-        except Exception as e:
-            logger.error(f"Error uploading metrics to Turso: {e}")
-
-    def _insert_ping_metrics(self, metrics_data):
-        """Insert ping metrics into SQLite database."""
-        try:
-            # Add site_id and location to metrics_data
             metrics_data['site_id'] = self.site_id
             metrics_data['location'] = self.location
             
