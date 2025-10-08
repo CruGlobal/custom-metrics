@@ -6,7 +6,7 @@ import logging
 import schedule
 import requests
 from datetime import datetime
-from libsql_client import Client
+from libsql_client import create_client
 import database
 
 # Configure logging
@@ -77,7 +77,7 @@ class NetworkMonitor:
             logger.error("Turso database URL or auth token not provided.")
             raise ValueError("Turso database URL and auth token must be set as environment variables.")
         try:
-            return Client(url=turso_database_url, auth_token=turso_auth_token)
+            return create_client(url=turso_database_url, auth_token=turso_auth_token)
         except Exception as e:
             logger.error(f"Failed to initialize Turso client: {e}")
             raise
