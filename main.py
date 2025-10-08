@@ -50,6 +50,12 @@ class NetworkMonitor:
         self.site_id = self._get_or_create_site_id()
         self.turso_client = self._init_turso_client()
         self.location = LOCATION
+        sync_interval_str = os.getenv("SYNC_INTERVAL")
+        try:
+            self.sync_interval_minutes = int(sync_interval_str) if sync_interval_str else 1440
+        except ValueError:
+            logger.warning(f"Invalid SYNC_INTERVAL '{sync_interval_str}'. Defaulting to 1440 minutes.")
+            self.sync_interval_minutes = 1440
         
     def _get_or_create_site_id(self):
         """Get existing site ID or create a new one."""
@@ -222,8 +228,8 @@ async def main():
     monitor.collect_ping_metrics()
     monitor.collect_speed_metrics()
     
-    # Schedule metrics upload every 24 hours
-    schedule.every(1440).minutes.do(lambda: asyncio.create_task(monitor.upload_metrics()))
+    # Schedule metrics upload every 24 hours or SYNC_INTERVAL
+    schedule.every(monitor.sync_interval_minutes).minutes.do(lambda: asyncio.create_task(monitor.upload_metrics()))
     
     # Keep the script running
     while True:

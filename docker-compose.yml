@@ -3,8 +3,6 @@ version: "3.8"
 services:
   custom-metrics:
     build: .
-    volumes:
-      - ./config/credentials.json:/app/config/credentials.json:ro
     environment:
       - PROMETHEUS_URL=${PROMETHEUS_URL}
       - LOCATION=${LOCATION}

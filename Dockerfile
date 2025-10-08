@@ -14,8 +14,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY main.py .
 COPY database.py .
 
-# Set environment variables
-ENV GOOGLE_APPLICATION_CREDENTIALS=/app/config/credentials.json
-
 # Run the application
 CMD ["python", "main.py"]

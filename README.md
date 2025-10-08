@@ -54,14 +54,6 @@ PROMETHEUS_URL=http://your-prometheus:9090
 LOCATION=your-location
 ```
 
-4. Set up Google Cloud credentials:
-
-Place your Google Cloud service account credentials JSON file in a secure location and set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable:
-
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/credentials.json"
-```
-
 ## Running the Service
 
 Start the service:
