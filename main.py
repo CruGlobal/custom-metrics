@@ -50,7 +50,7 @@ class NetworkMonitor:
         self.site_id = self._get_or_create_site_id()
         self.turso_client = self._init_turso_client()
         self.location = LOCATION
-        sync_interval_str = os.getenv("SYNC_INTERVAL")
+        sync_interval_str = os.getenv("SYNC_INTERVAL", "50")
         try:
             self.sync_interval_minutes = int(sync_interval_str) if sync_interval_str else 1440
         except ValueError:
