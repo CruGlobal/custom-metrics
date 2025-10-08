@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   custom-metrics:
@@ -6,9 +6,9 @@ services:
     volumes:
       - ./config/credentials.json:/app/config/credentials.json:ro
     environment:
-      - BIGQUERY_PROJECT=${BIGQUERY_PROJECT}
-      - BIGQUERY_DATASET=${BIGQUERY_DATASET}
-      - BIGQUERY_TABLE=${BIGQUERY_TABLE}
       - PROMETHEUS_URL=${PROMETHEUS_URL}
       - LOCATION=${LOCATION}
-    restart: unless-stopped 
+      - UPDATE_INTERVAL=${UPDATE_INTERVAL}
+      - TURSO_DATABASE_URL=${TURSO_DATABASE_URL}
+      - TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN}
+    restart: unless-stopped
