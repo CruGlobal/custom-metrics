@@ -6,8 +6,11 @@ import logging
 import schedule
 import requests
 from datetime import datetime
-import libsql
 import database
+from datetime import datetime
+from turso_python.connection import TursoConnection
+from turso_python.crud import TursoCRUD
+from turso_python.batch import TursoBatch
 
 # Configure logging
 logging.basicConfig(
@@ -48,7 +51,6 @@ class NetworkMonitor:
     def __init__(self):
         LOCATION = os.getenv("LOCATION", "unknown")
         self.site_id = self._get_or_create_site_id()
-        self.turso_client = self._init_turso_client()
         self.location = LOCATION
         sync_interval_str = os.getenv("SYNC_INTERVAL", "50")
         try:
@@ -69,19 +71,6 @@ class NetworkMonitor:
                 f.write(site_id)
             return site_id
 
-    def _init_turso_client(self):
-        """Initialize Turso client."""
-        auth_token = os.getenv("TURSO_DATABASE_URL")
-        url = os.getenv("TURSO_AUTH_TOKEN")
-        if not auth_token or not url:
-            logger.error("Turso database URL or auth token not provided.")
-            raise ValueError("Turso database URL and auth token must be set as environment variables.")
-        try:
-            return libsql.connect("scrypi", sync_url=url, auth_token=auth_token)
-        except Exception as e:
-            logger.error(f"Failed to initialize Turso client: {e}")
-            raise
-
     def _query_prometheus(self, query):
         """Query Prometheus for metrics."""
         try:
@@ -99,47 +88,32 @@ class NetworkMonitor:
     async def _mass_upload_metrics(self):
         """Upload all cached metrics from SQLite to Turso."""
         try:
+            crud = database.get_turso_crud()
+            
             # Get all ping metrics from SQLite
             ping_metrics = database.get_all_ping_metrics()
             
-            async with self.turso_client.transaction():
-                if ping_metrics:
-                    ping_values = [
-                        (
-                            metric['site_id'], metric['timestamp'], metric['location'],
-                            metric['google_up'], metric['apple_up'], metric['github_up'],
-                            metric['pihole_up'], metric['node_up'], metric['speedtest_up'],
-                            metric['http_latency'], metric['http_samples'], metric['http_time'],
-                            metric['http_content_length'], metric['http_duration']
-                        )
-                        for metric in ping_metrics
-                    ]
-                    # Using executemany for batch insertion of multiple ping records
-                    await self.turso_client.executemany(
-                        "INSERT INTO ping (site_id, timestamp, location, google_up, apple_up, github_up, pihole_up, node_up, speedtest_up, http_latency, http_samples, http_time, http_content_length, http_duration) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        ping_values
-                    )
-                    logger.info(f"Successfully inserted {len(ping_metrics)} ping metrics into Turso using batch insert.")
-                    database.clear_ping_metrics()
-                
-                # Get all speed metrics from SQLite
-                speed_metrics = database.get_all_speed_metrics()
-                
-                if speed_metrics:
-                    speed_values = [
-                        (
-                            metric['site_id'], metric['timestamp'], metric['location'],
-                            metric['download_mbps'], metric['upload_mbps'],
-                            metric['ping_ms'], metric['jitter_ms']
-                        )
-                        for metric in speed_metrics
-                    ]
-                    # Using executemany for batch insertion of multiple speed records
-                    await self.turso_client.executemany(
-                        "INSERT INTO speed (site_id, timestamp, location, download_mbps, upload_mbps, ping_ms, jitter_ms) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        speed_values
-                    )
-                    logger.info(f"Successfully inserted {len(speed_metrics)} speed metrics into Turso using batch insert.")
+            if ping_metrics:
+                batch = TursoBatch(crud.connection)
+                batch.batch_insert("ping_metrics", ping_metrics)
+                logger.info(f"Successfully inserted {len(ping_metrics)} ping metrics into Turso.")
+                database.clear_ping_metrics()
+            
+            # Get all speed metrics from SQLite
+            speed_metrics = database.get_all_speed_metrics()
+            
+            if speed_metrics:
+                batch = TursoBatch(crud.connection)
+                batch.batch_insert("speed_metrics", speed_metrics)
+                logger.info(f"Successfully inserted {len(speed_metrics)} speed metrics into Turso.")
+                database.clear_speed_metrics()
+        except Exception as e:
+            logger.error(f"Error uploading metrics to Turso: {e}")
+
+    def _insert_ping_metrics(self, metrics_data):
+        """Insert ping metrics into SQLite database."""
+        try:
+            # Add site_id and location to metrics_data
             metrics_data['site_id'] = self.site_id
             metrics_data['location'] = self.location
             

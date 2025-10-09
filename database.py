@@ -1,17 +1,18 @@
-import sqlite3
 import os
 from datetime import datetime
+from turso_python.connection import TursoConnection
+from turso_python.crud import TursoCRUD
 
-# Database file path
-DB_FILE = "metrics.db"
+def get_turso_crud():
+    connection = TursoConnection()
+    return TursoCRUD(connection)
 
 def init_db():
-    """Initialize the SQLite database with tables for ping and speed metrics."""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
+    """Initialize the Turso database with tables for ping and speed metrics."""
+    crud = get_turso_crud()
     
     # Create ping_metrics table
-    cursor.execute('''
+    crud.connection.execute('''
         CREATE TABLE IF NOT EXISTS ping_metrics (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
@@ -32,7 +33,7 @@ def init_db():
     ''')
     
     # Create speed_metrics table
-    cursor.execute('''
+    crud.connection.execute('''
         CREATE TABLE IF NOT EXISTS speed_metrics (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
@@ -44,14 +45,10 @@ def init_db():
             jitter_ms REAL
         )
     ''')
-    
-    conn.commit()
-    conn.close()
 
 def insert_ping_metrics(metrics_data):
-    """Insert ping metrics into the SQLite database."""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
+    """Insert ping metrics into the Turso database."""
+    crud = get_turso_crud()
     
     # Prepare the data for insertion
     data = {
@@ -72,25 +69,11 @@ def insert_ping_metrics(metrics_data):
     }
     
     # Insert the data
-    cursor.execute('''
-        INSERT INTO ping_metrics (
-            timestamp, site_id, location, google_up, apple_up, github_up, pihole_up, 
-            node_up, speedtest_up, http_latency, http_samples, http_time, 
-            http_content_length, http_duration
-        ) VALUES (
-            :timestamp, :site_id, :location, :google_up, :apple_up, :github_up, :pihole_up,
-            :node_up, :speedtest_up, :http_latency, :http_samples, :http_time,
-            :http_content_length, :http_duration
-        )
-    ''', data)
-    
-    conn.commit()
-    conn.close()
+    crud.create("ping_metrics", data)
 
 def insert_speed_metrics(metrics_data):
-    """Insert speed metrics into the SQLite database."""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
+    """Insert speed metrics into the Turso database."""
+    crud = get_turso_crud()
     
     # Prepare the data for insertion
     data = {
@@ -104,67 +87,24 @@ def insert_speed_metrics(metrics_data):
     }
     
     # Insert the data
-    cursor.execute('''
-        INSERT INTO speed_metrics (
-            timestamp, site_id, location, download_mbps, upload_mbps, ping_ms, jitter_ms
-        ) VALUES (
-            :timestamp, :site_id, :location, :download_mbps, :upload_mbps, :ping_ms, :jitter_ms
-        )
-    ''', data)
-    
-    conn.commit()
-    conn.close()
+    crud.create("speed_metrics", data)
 
 def get_all_ping_metrics():
     """Retrieve all ping metrics from the database."""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT * FROM ping_metrics')
-    rows = cursor.fetchall()
-    
-    # Get column names
-    column_names = [description[0] for description in cursor.description]
-    
-    # Convert rows to list of dictionaries
-    result = [dict(zip(column_names, row)) for row in rows]
-    
-    conn.close()
-    return result
+    crud = get_turso_crud()
+    return crud.read("ping_metrics")
 
 def get_all_speed_metrics():
     """Retrieve all speed metrics from the database."""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT * FROM speed_metrics')
-    rows = cursor.fetchall()
-    
-    # Get column names
-    column_names = [description[0] for description in cursor.description]
-    
-    # Convert rows to list of dictionaries
-    result = [dict(zip(column_names, row)) for row in rows]
-    
-    conn.close()
-    return result
+    crud = get_turso_crud()
+    return crud.read("speed_metrics")
 
 def clear_ping_metrics():
     """Clear all ping metrics from the database."""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    
-    cursor.execute('DELETE FROM ping_metrics')
-    
-    conn.commit()
-    conn.close()
+    crud = get_turso_crud()
+    crud.connection.execute('DELETE FROM ping_metrics')
 
 def clear_speed_metrics():
     """Clear all speed metrics from the database."""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    
-    cursor.execute('DELETE FROM speed_metrics')
-    
-    conn.commit()
-    conn.close()
+    crud = get_turso_crud()
+    crud.connection.execute('DELETE FROM speed_metrics')
