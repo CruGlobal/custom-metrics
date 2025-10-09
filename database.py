@@ -12,7 +12,7 @@ def init_db():
     crud = get_turso_crud()
     
     # Create ping_metrics table
-    crud.connection.execute('''
+    crud.connection.execute_query('''
         CREATE TABLE IF NOT EXISTS ping_metrics (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
@@ -33,7 +33,7 @@ def init_db():
     ''')
     
     # Create speed_metrics table
-    crud.connection.execute('''
+    crud.connection.execute_query('''
         CREATE TABLE IF NOT EXISTS speed_metrics (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             timestamp TEXT,
@@ -102,9 +102,9 @@ def get_all_speed_metrics():
 def clear_ping_metrics():
     """Clear all ping metrics from the database."""
     crud = get_turso_crud()
-    crud.connection.execute('DELETE FROM ping_metrics')
+    crud.connection.execute_query('DELETE FROM ping_metrics')
 
 def clear_speed_metrics():
     """Clear all speed metrics from the database."""
     crud = get_turso_crud()
-    crud.connection.execute('DELETE FROM speed_metrics')
+    crud.connection.execute_query('DELETE FROM speed_metrics')
