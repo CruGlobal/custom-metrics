@@ -87,19 +87,19 @@ def insert_ping_metrics(metrics_data):
     # Prepare the data for insertion
     data = {
         'timestamp': datetime.utcnow().isoformat(),
-        'site_id': metrics_data.get('site_id'),
-        'location': metrics_data.get('location'),
-        'google_up': metrics_data.get('google_up'),
-        'apple_up': metrics_data.get('apple_up'),
-        'github_up': metrics_data.get('github_up'),
-        'pihole_up': metrics_data.get('pihole_up'),
-        'node_up': metrics_data.get('node_up'),
-        'speedtest_up': metrics_data.get('speedtest_up'),
-        'http_latency': metrics_data.get('http_latency'),
-        'http_samples': metrics_data.get('http_samples'),
-        'http_time': metrics_data.get('http_time'),
-        'http_content_length': metrics_data.get('http_content_length'),
-        'http_duration': metrics_data.get('http_duration')
+        'site_id': str(metrics_data.get('site_id')) if metrics_data.get('site_id') is not None else None,
+        'location': str(metrics_data.get('location')) if metrics_data.get('location') is not None else None,
+        'google_up': float(metrics_data.get('google_up')) if metrics_data.get('google_up') is not None else None,
+        'apple_up': float(metrics_data.get('apple_up')) if metrics_data.get('apple_up') is not None else None,
+        'github_up': float(metrics_data.get('github_up')) if metrics_data.get('github_up') is not None else None,
+        'pihole_up': float(metrics_data.get('pihole_up')) if metrics_data.get('pihole_up') is not None else None,
+        'node_up': float(metrics_data.get('node_up')) if metrics_data.get('node_up') is not None else None,
+        'speedtest_up': float(metrics_data.get('speedtest_up')) if metrics_data.get('speedtest_up') is not None else None,
+        'http_latency': float(metrics_data.get('http_latency')) if metrics_data.get('http_latency') is not None else None,
+        'http_samples': float(metrics_data.get('http_samples')) if metrics_data.get('http_samples') is not None else None,
+        'http_time': float(metrics_data.get('http_time')) if metrics_data.get('http_time') is not None else None,
+        'http_content_length': float(metrics_data.get('http_content_length')) if metrics_data.get('http_content_length') is not None else None,
+        'http_duration': float(metrics_data.get('http_duration')) if metrics_data.get('http_duration') is not None else None
     }
 
     _validate_metrics_data(data, PING_METRICS_SCHEMA)
@@ -114,12 +114,12 @@ def insert_speed_metrics(metrics_data):
     # Prepare the data for insertion
     data = {
         'timestamp': datetime.utcnow().isoformat(),
-        'site_id': metrics_data.get('site_id'),
-        'location': metrics_data.get('location'),
-        'download_mbps': metrics_data.get('download_mbps'),
-        'upload_mbps': metrics_data.get('upload_mbps'),
-        'ping_ms': metrics_data.get('ping_ms'),
-        'jitter_ms': metrics_data.get('jitter_ms')
+        'site_id': str(metrics_data.get('site_id')) if metrics_data.get('site_id') is not None else None,
+        'location': str(metrics_data.get('location')) if metrics_data.get('location') is not None else None,
+        'download_mbps': float(metrics_data.get('download_mbps')) if metrics_data.get('download_mbps') is not None else None,
+        'upload_mbps': float(metrics_data.get('upload_mbps')) if metrics_data.get('upload_mbps') is not None else None,
+        'ping_ms': float(metrics_data.get('ping_ms')) if metrics_data.get('ping_ms') is not None else None,
+        'jitter_ms': float(metrics_data.get('jitter_ms')) if metrics_data.get('jitter_ms') is not None else None
     }
 
     _validate_metrics_data(data, SPEED_METRICS_SCHEMA)
