@@ -110,6 +110,16 @@ class NetworkMonitor:
         except Exception as e:
             logger.error(f"Error uploading metrics to Turso: {e}")
 
+    def _ensure_float_values(self, metrics_data):
+        """Ensure all numeric values in metrics_data are floats."""
+        for key, value in metrics_data.items():
+            if isinstance(value, str):
+                try:
+                    metrics_data[key] = float(value)
+                except ValueError:
+                    pass  # Keep as string if not a valid float
+        return metrics_data
+
     def _insert_ping_metrics(self, metrics_data):
         """Insert ping metrics into SQLite database."""
         try:
@@ -117,6 +127,9 @@ class NetworkMonitor:
             metrics_data['site_id'] = self.site_id
             metrics_data['location'] = self.location
             
+            # Ensure all numeric values are floats
+            metrics_data = self._ensure_float_values(metrics_data)
+
             # Insert into SQLite database
             database.insert_ping_metrics(metrics_data)
             logger.info("Successfully inserted ping metrics into SQLite")
@@ -130,6 +143,9 @@ class NetworkMonitor:
             metrics_data['site_id'] = self.site_id
             metrics_data['location'] = self.location
             
+            # Ensure all numeric values are floats
+            metrics_data = self._ensure_float_values(metrics_data)
+
             # Insert into SQLite database
             database.insert_speed_metrics(metrics_data)
             logger.info("Successfully inserted speed metrics into SQLite")
