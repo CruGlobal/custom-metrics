@@ -1,16 +1,10 @@
 import os
-import time
-import json
 import uuid
 import logging
 import schedule
 import requests
 from datetime import datetime
 import database
-from datetime import datetime
-from turso_python.connection import TursoConnection
-from turso_python.crud import TursoCRUD
-from turso_python.batch import TursoBatch
 
 # Configure logging
 logging.basicConfig(
@@ -52,12 +46,6 @@ class NetworkMonitor:
         LOCATION = os.getenv("LOCATION", "unknown")
         self.site_id = self._get_or_create_site_id()
         self.location = LOCATION
-        sync_interval_str = os.getenv("SYNC_INTERVAL", "50")
-        try:
-            self.sync_interval_minutes = int(sync_interval_str) if sync_interval_str else 1440
-        except ValueError:
-            logger.warning(f"Invalid SYNC_INTERVAL '{sync_interval_str}'. Defaulting to 1440 minutes.")
-            self.sync_interval_minutes = 1440
         
     def _get_or_create_site_id(self):
         """Get existing site ID or create a new one."""
@@ -85,31 +73,6 @@ class NetworkMonitor:
             logger.error(f"Failed to query Prometheus: {e}")
             return None
 
-    async def _mass_upload_metrics(self):
-        """Upload all cached metrics from SQLite to Turso."""
-        try:
-            crud = database.get_turso_crud()
-            
-            # Get all ping metrics from SQLite
-            ping_metrics = database.get_all_ping_metrics()
-            
-            if ping_metrics:
-                batch = TursoBatch(crud.connection)
-                batch.batch_insert("ping_metrics", ping_metrics)
-                logger.info(f"Successfully inserted {len(ping_metrics)} ping metrics into Turso.")
-                database.clear_ping_metrics()
-            
-            # Get all speed metrics from SQLite
-            speed_metrics = database.get_all_speed_metrics()
-            
-            if speed_metrics:
-                batch = TursoBatch(crud.connection)
-                batch.batch_insert("speed_metrics", speed_metrics)
-                logger.info(f"Successfully inserted {len(speed_metrics)} speed metrics into Turso.")
-                database.clear_speed_metrics()
-        except Exception as e:
-            logger.error(f"Error uploading metrics to Turso: {e}")
-
     def _ensure_float_values(self, metrics_data):
         """Ensure all numeric values in metrics_data are floats."""
         for key, value in metrics_data.items():
@@ -121,7 +84,7 @@ class NetworkMonitor:
         return metrics_data
 
     def _insert_ping_metrics(self, metrics_data):
-        """Insert ping metrics into SQLite database."""
+        """Insert ping metrics directly into Turso database."""
         try:
             # Add site_id and location to metrics_data
             metrics_data['site_id'] = self.site_id
@@ -130,14 +93,14 @@ class NetworkMonitor:
             # Ensure all numeric values are floats
             metrics_data = self._ensure_float_values(metrics_data)
 
-            # Insert into SQLite database
+            # Insert into Turso database
             database.insert_ping_metrics(metrics_data)
-            logger.info("Successfully inserted ping metrics into SQLite")
+            logger.info("Successfully inserted ping metrics into Turso")
         except Exception as e:
-            logger.error(f"Error inserting ping metrics into SQLite: {e}")
+            logger.error(f"Error inserting ping metrics into Turso: {e}")
 
     def _insert_speed_metrics(self, metrics_data):
-        """Insert speedtest metrics into SQLite database."""
+        """Insert speedtest metrics directly into Turso database."""
         try:
             # Add site_id and location to metrics_data
             metrics_data['site_id'] = self.site_id
@@ -146,16 +109,11 @@ class NetworkMonitor:
             # Ensure all numeric values are floats
             metrics_data = self._ensure_float_values(metrics_data)
 
-            # Insert into SQLite database
+            # Insert into Turso database
             database.insert_speed_metrics(metrics_data)
-            logger.info("Successfully inserted speed metrics into SQLite")
+            logger.info("Successfully inserted speed metrics into Turso")
         except Exception as e:
-            logger.error(f"Error inserting speed metrics into SQLite: {e}")
-
-    async def upload_metrics(self):
-        """Collect and upload metrics."""
-        logger.info("Uploading metrics...")
-        await self._mass_upload_metrics()
+            logger.error(f"Error inserting speed metrics into Turso: {e}")
 
     def collect_ping_metrics(self):
         """Collect and store ping metrics."""
@@ -217,9 +175,6 @@ async def main():
     # Run initial collection
     monitor.collect_ping_metrics()
     monitor.collect_speed_metrics()
-    
-    # Schedule metrics upload every 24 hours or SYNC_INTERVAL
-    schedule.every(monitor.sync_interval_minutes).minutes.do(lambda: asyncio.create_task(monitor.upload_metrics()))
     
     # Keep the script running
     while True:

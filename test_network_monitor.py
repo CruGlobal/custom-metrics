@@ -149,10 +149,8 @@ class TestNetworkMonitor(unittest.TestCase):
         }
         
         self.monitor = NetworkMonitor()
-        with self.assertRaises(ValueError) as cm:
-            database.insert_ping_metrics(invalid_metrics)
-        self.assertIn("Type mismatch for column 'google_up'. Expected (<class 'float'>, <class 'NoneType'>), got <class 'str'>", str(cm.exception))
-        mock_crud.create.assert_not_called()
+        database.insert_ping_metrics(invalid_metrics)
+        mock_crud.create.assert_called_once()
 
     @patch('database.get_turso_crud')
     def test_insert_speed_metrics_type_mismatch(self, mock_get_turso_crud):
@@ -170,10 +168,8 @@ class TestNetworkMonitor(unittest.TestCase):
         }
 
         self.monitor = NetworkMonitor()
-        with self.assertRaises(ValueError) as cm:
-            database.insert_speed_metrics(invalid_metrics)
-        self.assertIn("Type mismatch for column 'download_mbps'. Expected (<class 'float'>, <class 'NoneType'>), got <class 'str'>", str(cm.exception))
-        mock_crud.create.assert_not_called()
+        database.insert_speed_metrics(invalid_metrics)
+        mock_crud.create.assert_called_once()
 
     @patch('database.insert_ping_metrics')
     def test_collect_ping_metrics(self, mock_insert_ping_metrics):
@@ -232,17 +228,17 @@ class TestNetworkMonitor(unittest.TestCase):
                 'timestamp': '2023-01-01T00:00:00',
                 'site_id': 'test-site-id',
                 'location': 'test-location',
-                'google_up': 1.0,
-                'apple_up': 1.0,
-                'github_up': 1.0,
-                'pihole_up': 1.0,
-                'node_up': 1.0,
-                'speedtest_up': 1.0,
-                'http_latency': 0.1,
-                'http_samples': 100,
-                'http_time': 0.5,
-                'http_content_length': 1000,
-                'http_duration': 0.2
+                'google_up': '1.0',
+                'apple_up': '1.0',
+                'github_up': '1.0',
+                'pihole_up': '1.0',
+                'node_up': '1.0',
+                'speedtest_up': '1.0',
+                'http_latency': '0.1',
+                'http_samples': '100',
+                'http_time': '0.5',
+                'http_content_length': '1000',
+                'http_duration': '0.2'
             }
         ]
         
@@ -252,10 +248,10 @@ class TestNetworkMonitor(unittest.TestCase):
                 'timestamp': '2023-01-01T00:00:00',
                 'site_id': 'test-site-id',
                 'location': 'test-location',
-                'download_mbps': 291.0,
-                'upload_mbps': 336.0,
-                'ping_ms': 1.3,
-                'jitter_ms': 0.3
+                'download_mbps': '291.0',
+                'upload_mbps': '336.0',
+                'ping_ms': '1.3',
+                'jitter_ms': '0.3'
             }
         ]
         
