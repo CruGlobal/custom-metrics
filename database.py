@@ -3,9 +3,43 @@ from datetime import datetime
 from turso_python.connection import TursoConnection
 from turso_python.crud import TursoCRUD
 
+# Define expected types for each table's columns
+PING_METRICS_SCHEMA = {
+    'timestamp': str,
+    'site_id': str,
+    'location': str,
+    'google_up': (float, type(None)),
+    'apple_up': (float, type(None)),
+    'github_up': (float, type(None)),
+    'pihole_up': (float, type(None)),
+    'node_up': (float, type(None)),
+    'speedtest_up': (float, type(None)),
+    'http_latency': (float, type(None)),
+    'http_samples': (float, type(None)),
+    'http_time': (float, type(None)),
+    'http_content_length': (float, type(None)),
+    'http_duration': (float, type(None)),
+}
+
+SPEED_METRICS_SCHEMA = {
+    'timestamp': str,
+    'site_id': str,
+    'location': str,
+    'download_mbps': (float, type(None)),
+    'upload_mbps': (float, type(None)),
+    'ping_ms': (float, type(None)),
+    'jitter_ms': (float, type(None)),
+}
+
 def get_turso_crud():
     connection = TursoConnection()
     return TursoCRUD(connection)
+
+def _validate_metrics_data(data, schema):
+    """Validate if the metrics data conforms to the expected schema types."""
+    for key, expected_type in schema.items():
+        if key in data and not isinstance(data[key], expected_type):
+            raise ValueError(f"Type mismatch for column '{key}'. Expected {expected_type}, got {type(data[key])}")
 
 def init_db():
     """Initialize the Turso database with tables for ping and speed metrics."""
@@ -67,6 +101,8 @@ def insert_ping_metrics(metrics_data):
         'http_content_length': metrics_data.get('http_content_length'),
         'http_duration': metrics_data.get('http_duration')
     }
+
+    _validate_metrics_data(data, PING_METRICS_SCHEMA)
     
     # Insert the data
     crud.create("ping_metrics", data)
@@ -85,6 +121,8 @@ def insert_speed_metrics(metrics_data):
         'ping_ms': metrics_data.get('ping_ms'),
         'jitter_ms': metrics_data.get('jitter_ms')
     }
+
+    _validate_metrics_data(data, SPEED_METRICS_SCHEMA)
     
     # Insert the data
     crud.create("speed_metrics", data)

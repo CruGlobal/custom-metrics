@@ -133,6 +133,48 @@ class TestNetworkMonitor(unittest.TestCase):
         self.monitor._insert_speed_metrics(test_metrics)
         mock_insert_speed_metrics.assert_called_once()
 
+    @patch('database.get_turso_crud')
+    def test_insert_ping_metrics_type_mismatch(self, mock_get_turso_crud):
+        """Test ping metrics insertion with type mismatch."""
+        mock_crud = MagicMock()
+        mock_get_turso_crud.return_value = mock_crud
+
+        invalid_metrics = {
+            'google_up': "not a float",  # Invalid type
+            'apple_up': 1.0,
+            'github_up': 1.0,
+            'http_latency': 0.1,
+            'site_id': 'test-site',
+            'location': 'test-location'
+        }
+        
+        self.monitor = NetworkMonitor()
+        with self.assertRaises(ValueError) as cm:
+            database.insert_ping_metrics(invalid_metrics)
+        self.assertIn("Type mismatch for column 'google_up'. Expected (<class 'float'>, <class 'NoneType'>), got <class 'str'>", str(cm.exception))
+        mock_crud.create.assert_not_called()
+
+    @patch('database.get_turso_crud')
+    def test_insert_speed_metrics_type_mismatch(self, mock_get_turso_crud):
+        """Test speed metrics insertion with type mismatch."""
+        mock_crud = MagicMock()
+        mock_get_turso_crud.return_value = mock_crud
+
+        invalid_metrics = {
+            'download_mbps': "not a float",  # Invalid type
+            'upload_mbps': 336.0,
+            'ping_ms': 1.3,
+            'jitter_ms': 0.3,
+            'site_id': 'test-site',
+            'location': 'test-location'
+        }
+
+        self.monitor = NetworkMonitor()
+        with self.assertRaises(ValueError) as cm:
+            database.insert_speed_metrics(invalid_metrics)
+        self.assertIn("Type mismatch for column 'download_mbps'. Expected (<class 'float'>, <class 'NoneType'>), got <class 'str'>", str(cm.exception))
+        mock_crud.create.assert_not_called()
+
     @patch('database.insert_ping_metrics')
     def test_collect_ping_metrics(self, mock_insert_ping_metrics):
         """Test collecting ping metrics."""
