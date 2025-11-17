@@ -7,7 +7,6 @@ import psycopg
 
 LOCAL_DB_PATH = "/data/metrics.db"
 # The connection string is now handled by environment variables
-# POSTGRES_CONN_STRING = os.environ.get("POSTGRES_CONN_STRING")
 
 # Define expected types for each table's columns
 PING_METRICS_SCHEMA = {
