@@ -38,8 +38,16 @@ SPEED_METRICS_SCHEMA = {
 
 def get_db_connection():
     if os.environ.get("USE_POSTGRES") == "true":
-        # psycopg automatically uses PG* environment variables if no connection string is provided
-        return psycopg.connect("")
+        # Construct connection string explicitly from environment variables
+        conn_string = (
+            f"host={os.environ.get('PGHOST')} "
+            f"user={os.environ.get('PGUSER')} "
+            f"password={os.environ.get('PGPASSWORD')} "
+            f"dbname={os.environ.get('PGDATABASE')} "
+            f"sslmode={os.environ.get('PGSSLMODE')} "
+            f"channel_binding={os.environ.get('PGCHANNELBINDING')}"
+        )
+        return psycopg.connect(conn_string)
     elif os.environ.get("USE_LOCAL_DB") == "true":
         conn = sqlite3.connect(LOCAL_DB_PATH)
         conn.row_factory = sqlite3.Row
