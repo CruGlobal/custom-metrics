@@ -84,7 +84,7 @@ class NetworkMonitor:
         return metrics_data
 
     def _insert_ping_metrics(self, metrics_data):
-        """Insert ping metrics directly into Turso database."""
+        """Insert ping metrics directly into the database."""
         try:
             # Add site_id and location to metrics_data
             metrics_data['site_id'] = self.site_id
@@ -93,14 +93,14 @@ class NetworkMonitor:
             # Ensure all numeric values are floats
             metrics_data = self._ensure_float_values(metrics_data)
 
-            # Insert into Turso database
+            # Insert into the database
             database.insert_ping_metrics(metrics_data)
-            logger.info("Successfully inserted ping metrics into Turso")
+            logger.info("Successfully inserted ping metrics into the database")
         except Exception as e:
-            logger.error(f"Error inserting ping metrics into Turso: {e}")
+            logger.error(f"Error inserting ping metrics into the database: {e}")
 
     def _insert_speed_metrics(self, metrics_data):
-        """Insert speedtest metrics directly into Turso database."""
+        """Insert speedtest metrics directly into the database."""
         try:
             # Add site_id and location to metrics_data
             metrics_data['site_id'] = self.site_id
@@ -109,11 +109,11 @@ class NetworkMonitor:
             # Ensure all numeric values are floats
             metrics_data = self._ensure_float_values(metrics_data)
 
-            # Insert into Turso database
+            # Insert into the database
             database.insert_speed_metrics(metrics_data)
-            logger.info("Successfully inserted speed metrics into Turso")
+            logger.info("Successfully inserted speed metrics into the database")
         except Exception as e:
-            logger.error(f"Error inserting speed metrics into Turso: {e}")
+            logger.error(f"Error inserting speed metrics into the database: {e}")
 
     def collect_ping_metrics(self):
         """Collect and store ping metrics."""

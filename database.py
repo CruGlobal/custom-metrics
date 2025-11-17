@@ -2,6 +2,12 @@ import os
 from datetime import datetime
 from turso_python.connection import TursoConnection
 from turso_python.crud import TursoCRUD
+import sqlite3
+import psycopg
+
+LOCAL_DB_PATH = "/data/metrics.db"
+# The connection string is now handled by environment variables
+# POSTGRES_CONN_STRING = os.environ.get("POSTGRES_CONN_STRING")
 
 # Define expected types for each table's columns
 PING_METRICS_SCHEMA = {
@@ -31,6 +37,18 @@ SPEED_METRICS_SCHEMA = {
     'jitter_ms': (str, type(None)),
 }
 
+def get_db_connection():
+    if os.environ.get("USE_POSTGRES") == "true":
+        # psycopg automatically uses PG* environment variables if no connection string is provided
+        return psycopg.connect("")
+    elif os.environ.get("USE_LOCAL_DB") == "true":
+        conn = sqlite3.connect(LOCAL_DB_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn
+    else:
+        connection = TursoConnection()
+        return TursoCRUD(connection)
+
 def get_turso_crud():
     connection = TursoConnection()
     return TursoCRUD(connection)
@@ -42,49 +60,124 @@ def _validate_metrics_data(data, schema):
             raise ValueError(f"Type mismatch for column '{key}'. Expected {expected_type}, got {type(data[key])}")
 
 def init_db():
-    """Initialize the Turso database with tables for ping and speed metrics."""
-    crud = get_turso_crud()
-    
-    # Create ping_metrics table
-    crud.connection.execute_query('''
-        CREATE TABLE IF NOT EXISTS ping_metrics (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT,
-            site_id TEXT,
-            location TEXT,
-            google_up TEXT,
-            apple_up TEXT,
-            github_up TEXT,
-            pihole_up TEXT,
-            node_up TEXT,
-            speedtest_up TEXT,
-            http_latency TEXT,
-            http_samples TEXT,
-            http_time TEXT,
-            http_content_length TEXT,
-            http_duration TEXT
+    """Initialize the database with tables for ping and speed metrics."""
+    if os.environ.get("USE_POSTGRES") == "true":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ping_metrics (
+                id SERIAL PRIMARY KEY,
+                timestamp TEXT,
+                site_id TEXT,
+                location TEXT,
+                google_up TEXT,
+                apple_up TEXT,
+                github_up TEXT,
+                pihole_up TEXT,
+                node_up TEXT,
+                speedtest_up TEXT,
+                http_latency TEXT,
+                http_samples TEXT,
+                http_time TEXT,
+                http_content_length TEXT,
+                http_duration TEXT
+            )
+        """
         )
-    ''')
-    
-    # Create speed_metrics table
-    crud.connection.execute_query('''
-        CREATE TABLE IF NOT EXISTS speed_metrics (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT,
-            site_id TEXT,
-            location TEXT,
-            download_mbps TEXT,
-            upload_mbps TEXT,
-            ping_ms TEXT,
-            jitter_ms TEXT
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS speed_metrics (
+                id SERIAL PRIMARY KEY,
+                timestamp TEXT,
+                site_id TEXT,
+                location TEXT,
+                download_mbps TEXT,
+                upload_mbps TEXT,
+                ping_ms TEXT,
+                jitter_ms TEXT
+            )
+        """
         )
-    ''')
+        conn.commit()
+        conn.close()
+    elif os.environ.get("USE_LOCAL_DB") == "true":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ping_metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                site_id TEXT,
+                location TEXT,
+                google_up TEXT,
+                apple_up TEXT,
+                github_up TEXT,
+                pihole_up TEXT,
+                node_up TEXT,
+                speedtest_up TEXT,
+                http_latency TEXT,
+                http_samples TEXT,
+                http_time TEXT,
+                http_content_length TEXT,
+                http_duration TEXT
+            )
+        """
+        )
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS speed_metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                site_id TEXT,
+                location TEXT,
+                download_mbps TEXT,
+                upload_mbps TEXT,
+                ping_ms TEXT,
+                jitter_ms TEXT
+            )
+        """
+        )
+        conn.commit()
+        conn.close()
+    else:
+        crud = get_turso_crud()
+        # Create ping_metrics table
+        crud.connection.execute_query("""
+            CREATE TABLE IF NOT EXISTS ping_metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                site_id TEXT,
+                location TEXT,
+                google_up TEXT,
+                apple_up TEXT,
+                github_up TEXT,
+                pihole_up TEXT,
+                node_up TEXT,
+                speedtest_up TEXT,
+                http_latency TEXT,
+                http_samples TEXT,
+                http_time TEXT,
+                http_content_length TEXT,
+                http_duration TEXT
+            )
+        """
+        )
+        
+        # Create speed_metrics table
+        crud.connection.execute_query("""
+            CREATE TABLE IF NOT EXISTS speed_metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT,
+                site_id TEXT,
+                location TEXT,
+                download_mbps TEXT,
+                upload_mbps TEXT,
+                ping_ms TEXT,
+                jitter_ms TEXT
+            )
+        """
+        )
 
 def insert_ping_metrics(metrics_data):
-    """Insert ping metrics into the Turso database."""
-    crud = get_turso_crud()
-    
-    # Prepare the data for insertion
+    """Insert ping metrics into the database."""
     data = {
         'timestamp': datetime.utcnow().isoformat(),
         'site_id': str(metrics_data.get('site_id')) if metrics_data.get('site_id') is not None else None,
@@ -103,15 +196,29 @@ def insert_ping_metrics(metrics_data):
     }
 
     _validate_metrics_data(data, PING_METRICS_SCHEMA)
-    
-    # Insert the data
-    crud.create("ping_metrics", data)
+
+    if os.environ.get("USE_POSTGRES") == "true":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join(["%s"] * len(data))
+        cursor.execute(f"INSERT INTO ping_metrics ({columns}) VALUES ({placeholders})", list(data.values()))
+        conn.commit()
+        conn.close()
+    elif os.environ.get("USE_LOCAL_DB") == "true":
+        conn = get_db_connection()
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join([":" + key for key in data.keys()])
+        cursor = conn.cursor()
+        cursor.execute(f"INSERT INTO ping_metrics ({columns}) VALUES ({placeholders})", data)
+        conn.commit()
+        conn.close()
+    else:
+        crud = get_turso_crud()
+        crud.create("ping_metrics", data)
 
 def insert_speed_metrics(metrics_data):
-    """Insert speed metrics into the Turso database."""
-    crud = get_turso_crud()
-    
-    # Prepare the data for insertion
+    """Insert speed metrics into the database."""
     data = {
         'timestamp': datetime.utcnow().isoformat(),
         'site_id': str(metrics_data.get('site_id')) if metrics_data.get('site_id') is not None else None,
@@ -123,26 +230,99 @@ def insert_speed_metrics(metrics_data):
     }
 
     _validate_metrics_data(data, SPEED_METRICS_SCHEMA)
-    
-    # Insert the data
-    crud.create("speed_metrics", data)
+
+    if os.environ.get("USE_POSTGRES") == "true":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join(["%s"] * len(data))
+        cursor.execute(f"INSERT INTO speed_metrics ({columns}) VALUES ({placeholders})", list(data.values()))
+        conn.commit()
+        conn.close()
+    elif os.environ.get("USE_LOCAL_DB") == "true":
+        conn = get_db_connection()
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join([":" + key for key in data.keys()])
+        cursor = conn.cursor()
+        cursor.execute(f"INSERT INTO speed_metrics ({columns}) VALUES ({placeholders})", data)
+        conn.commit()
+        conn.close()
+    else:
+        crud = get_turso_crud()
+        crud.create("speed_metrics", data)
 
 def get_all_ping_metrics():
     """Retrieve all ping metrics from the database."""
-    crud = get_turso_crud()
-    return crud.read("ping_metrics")
+    if os.environ.get("USE_POSTGRES") == "true":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM ping_metrics")
+        metrics = cursor.fetchall()
+        conn.close()
+        return metrics
+    elif os.environ.get("USE_LOCAL_DB") == "true":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM ping_metrics")
+        metrics = cursor.fetchall()
+        conn.close()
+        return metrics
+    else:
+        crud = get_turso_crud()
+        return crud.read("ping_metrics")
 
 def get_all_speed_metrics():
     """Retrieve all speed metrics from the database."""
-    crud = get_turso_crud()
-    return crud.read("speed_metrics")
+    if os.environ.get("USE_POSTGRES") == "true":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM speed_metrics")
+        metrics = cursor.fetchall()
+        conn.close()
+        return metrics
+    elif os.environ.get("USE_LOCAL_DB") == "true":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM speed_metrics")
+        metrics = cursor.fetchall()
+        conn.close()
+        return metrics
+    else:
+        crud = get_turso_crud()
+        return crud.read("speed_metrics")
 
 def clear_ping_metrics():
     """Clear all ping metrics from the database."""
-    crud = get_turso_crud()
-    crud.connection.execute_query('DELETE FROM ping_metrics')
+    if os.environ.get("USE_POSTGRES") == "true":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM ping_metrics")
+        conn.commit()
+        conn.close()
+    elif os.environ.get("USE_LOCAL_DB") == "true":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM ping_metrics")
+        conn.commit()
+        conn.close()
+    else:
+        crud = get_turso_crud()
+        crud.connection.execute_query('DELETE FROM ping_metrics')
 
 def clear_speed_metrics():
     """Clear all speed metrics from the database."""
-    crud = get_turso_crud()
-    crud.connection.execute_query('DELETE FROM speed_metrics')
+    if os.environ.get("USE_POSTGRES") == "true":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM speed_metrics")
+        conn.commit()
+        conn.close()
+    elif os.environ.get("USE_LOCAL_DB") == "true":
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM speed_metrics")
+        conn.commit()
+        conn.close()
+    else:
+        crud = get_turso_crud()
+        crud.connection.execute_query('DELETE FROM speed_metrics')

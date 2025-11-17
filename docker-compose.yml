@@ -9,4 +9,20 @@ services:
       - UPDATE_INTERVAL=${UPDATE_INTERVAL}
       - TURSO_DATABASE_URL=${TURSO_DATABASE_URL}
       - TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN}
+      - USE_POSTGRES=${USE_POSTGRES}
+      - POSTGRES_CONN_STRING=${POSTGRES_CONN_STRING}
     restart: unless-stopped
+
+  db-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.db_manager
+    environment:
+      - TURSO_DATABASE_URL=${TURSO_DATABASE_URL}
+      - TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN}
+    volumes:
+      - custom_metrics_data:/data
+    restart: on-failure
+
+volumes:
+  custom_metrics_data: {}
