@@ -43,10 +43,24 @@ SPEED_METRICS = {
 
 class NetworkMonitor:
     def __init__(self):
-        LOCATION = os.getenv("LOCATION", "unknown")
         self.site_id = self._get_or_create_site_id()
-        self.location = LOCATION
+        self.ip_address, self.location = self._get_ip_and_location()
         
+    def _get_ip_and_location(self):
+        """Get public IP address and location."""
+        try:
+            response = requests.get("https://ipinfo.io/json")
+            response.raise_for_status()
+            data = response.json()
+            ip = data.get("ip")
+            city = data.get("city", "unknown")
+            region = data.get("region", "unknown")
+            country = data.get("country", "unknown")
+            return ip, f"{city}, {region}, {country}"
+        except Exception as e:
+            logger.error(f"Failed to get IP and location: {e}")
+            return "unknown", "unknown"
+
     def _get_or_create_site_id(self):
         """Get existing site ID or create a new one."""
         if os.path.exists(SITE_ID_FILE):
@@ -89,6 +103,7 @@ class NetworkMonitor:
             # Add site_id and location to metrics_data
             metrics_data['site_id'] = self.site_id
             metrics_data['location'] = self.location
+            metrics_data['ip_address'] = self.ip_address
             
             # Ensure all numeric values are floats
             metrics_data = self._ensure_float_values(metrics_data)
@@ -105,6 +120,7 @@ class NetworkMonitor:
             # Add site_id and location to metrics_data
             metrics_data['site_id'] = self.site_id
             metrics_data['location'] = self.location
+            metrics_data['ip_address'] = self.ip_address
             
             # Ensure all numeric values are floats
             metrics_data = self._ensure_float_values(metrics_data)
