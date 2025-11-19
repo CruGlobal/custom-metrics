@@ -37,25 +37,16 @@ SPEED_METRICS_SCHEMA = {
 }
 
 def get_db_connection():
-    if os.environ.get("USE_POSTGRES") == "true":
-        # Construct connection string explicitly from environment variables
-        conn_string = (
-            f"host={os.environ.get('PGHOST')} "
-            f"user={os.environ.get('PGUSER')} "
-            f"password={os.environ.get('PGPASSWORD')} "
-            f"dbname={os.environ.get('PGDATABASE')} "
-            f"sslmode={os.environ.get('PGSSLMODE')} "
-            f"channel_binding={os.environ.get('PGCHANNELBINDING')}"
-        )
-        return psycopg.connect(conn_string)
-    elif os.environ.get("USE_LOCAL_DB") == "true":
-        conn = sqlite3.connect(LOCAL_DB_PATH)
-        conn.row_factory = sqlite3.Row
-        return conn
-    # Fallback to local DB if no specific environment is set
-    conn = sqlite3.connect(LOCAL_DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    # Construct connection string explicitly from environment variables
+    conn_string = (
+        f"host={os.environ.get('PGHOST')} "
+        f"user={os.environ.get('PGUSER')} "
+        f"password={os.environ.get('PGPASSWORD')} "
+        f"dbname={os.environ.get('PGDATABASE')} "
+        f"sslmode={os.environ.get('PGSSLMODE')} "
+        f"channel_binding={os.environ.get('PGCHANNELBINDING')}"
+    )
+    return psycopg.connect(conn_string)
 
 def _validate_metrics_data(data, schema):
     """Validate if the metrics data conforms to the expected schema types."""
@@ -65,86 +56,45 @@ def _validate_metrics_data(data, schema):
 
 def init_db():
     """Initialize the database with tables for ping and speed metrics."""
-    if os.environ.get("USE_POSTGRES") == "true":
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS ping_metrics (
-                id SERIAL PRIMARY KEY,
-                timestamp TEXT,
-                site_id TEXT,
-                location TEXT,
-                ip_address TEXT,
-                google_up TEXT,
-                apple_up TEXT,
-                github_up TEXT,
-                pihole_up TEXT,
-                node_up TEXT,
-                speedtest_up TEXT,
-                http_latency TEXT,
-                http_samples TEXT,
-                http_time TEXT,
-                http_content_length TEXT,
-                http_duration TEXT
-            )
-        """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS ping_metrics (
+            id SERIAL PRIMARY KEY,
+            timestamp TEXT,
+            site_id TEXT,
+            location TEXT,
+            ip_address TEXT,
+            google_up TEXT,
+            apple_up TEXT,
+            github_up TEXT,
+            pihole_up TEXT,
+            node_up TEXT,
+            speedtest_up TEXT,
+            http_latency TEXT,
+            http_samples TEXT,
+            http_time TEXT,
+            http_content_length TEXT,
+            http_duration TEXT
         )
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS speed_metrics (
-                id SERIAL PRIMARY KEY,
-                timestamp TEXT,
-                site_id TEXT,
-                location TEXT,
-                ip_address TEXT,
-                download_mbps TEXT,
-                upload_mbps TEXT,
-                ping_ms TEXT,
-                jitter_ms TEXT
-            )
-        """
+    """
+    )
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS speed_metrics (
+            id SERIAL PRIMARY KEY,
+            timestamp TEXT,
+            site_id TEXT,
+            location TEXT,
+            ip_address TEXT,
+            download_mbps TEXT,
+            upload_mbps TEXT,
+            ping_ms TEXT,
+            jitter_ms TEXT
         )
-        conn.commit()
-        conn.close()
-    elif os.environ.get("USE_LOCAL_DB") == "true":
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS ping_metrics (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT,
-                site_id TEXT,
-                location TEXT,
-                ip_address TEXT,
-                google_up TEXT,
-                apple_up TEXT,
-                github_up TEXT,
-                pihole_up TEXT,
-                node_up TEXT,
-                speedtest_up TEXT,
-                http_latency TEXT,
-                http_samples TEXT,
-                http_time TEXT,
-                http_content_length TEXT,
-                http_duration TEXT
-            )
-        """
-        )
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS speed_metrics (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT,
-                site_id TEXT,
-                location TEXT,
-                ip_address TEXT,
-                download_mbps TEXT,
-                upload_mbps TEXT,
-                ping_ms TEXT,
-                jitter_ms TEXT
-            )
-        """
-        )
-        conn.commit()
-        conn.close()
+    """
+    )
+    conn.commit()
+    conn.close()
 
 def insert_ping_metrics(metrics_data):
     """Insert ping metrics into the database."""
@@ -168,22 +118,13 @@ def insert_ping_metrics(metrics_data):
 
     _validate_metrics_data(data, PING_METRICS_SCHEMA)
 
-    if os.environ.get("USE_POSTGRES") == "true":
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        columns = ", ".join(data.keys())
-        placeholders = ", ".join(["%s"] * len(data))
-        cursor.execute(f"INSERT INTO ping_metrics ({columns}) VALUES ({placeholders})", list(data.values()))
-        conn.commit()
-        conn.close()
-    elif os.environ.get("USE_LOCAL_DB") == "true":
-        conn = get_db_connection()
-        columns = ", ".join(data.keys())
-        placeholders = ", ".join([":" + key for key in data.keys()])
-        cursor = conn.cursor()
-        cursor.execute(f"INSERT INTO ping_metrics ({columns}) VALUES ({placeholders})", data)
-        conn.commit()
-        conn.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    columns = ", ".join(data.keys())
+    placeholders = ", ".join(["%s"] * len(data))
+    cursor.execute(f"INSERT INTO ping_metrics ({columns}) VALUES ({placeholders})", list(data.values()))
+    conn.commit()
+    conn.close()
 
 def insert_speed_metrics(metrics_data):
     """Insert speed metrics into the database."""
@@ -200,83 +141,44 @@ def insert_speed_metrics(metrics_data):
 
     _validate_metrics_data(data, SPEED_METRICS_SCHEMA)
 
-    if os.environ.get("USE_POSTGRES") == "true":
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        columns = ", ".join(data.keys())
-        placeholders = ", ".join(["%s"] * len(data))
-        cursor.execute(f"INSERT INTO speed_metrics ({columns}) VALUES ({placeholders})", list(data.values()))
-        conn.commit()
-        conn.close()
-    elif os.environ.get("USE_LOCAL_DB") == "true":
-        conn = get_db_connection()
-        columns = ", ".join(data.keys())
-        placeholders = ", ".join([":" + key for key in data.keys()])
-        cursor = conn.cursor()
-        cursor.execute(f"INSERT INTO speed_metrics ({columns}) VALUES ({placeholders})", data)
-        conn.commit()
-        conn.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    columns = ", ".join(data.keys())
+    placeholders = ", ".join(["%s"] * len(data))
+    cursor.execute(f"INSERT INTO speed_metrics ({columns}) VALUES ({placeholders})", list(data.values()))
+    conn.commit()
+    conn.close()
 
 def get_all_ping_metrics():
     """Retrieve all ping metrics from the database."""
-    if os.environ.get("USE_POSTGRES") == "true":
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM ping_metrics")
-        metrics = cursor.fetchall()
-        conn.close()
-        return metrics
-    elif os.environ.get("USE_LOCAL_DB") == "true":
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM ping_metrics")
-        metrics = cursor.fetchall()
-        conn.close()
-        return metrics
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM ping_metrics")
+    metrics = cursor.fetchall()
+    conn.close()
+    return metrics
 
 def get_all_speed_metrics():
     """Retrieve all speed metrics from the database."""
-    if os.environ.get("USE_POSTGRES") == "true":
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM speed_metrics")
-        metrics = cursor.fetchall()
-        conn.close()
-        return metrics
-    elif os.environ.get("USE_LOCAL_DB") == "true":
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM speed_metrics")
-        metrics = cursor.fetchall()
-        conn.close()
-        return metrics
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM speed_metrics")
+    metrics = cursor.fetchall()
+    conn.close()
+    return metrics
 
 def clear_ping_metrics():
     """Clear all ping metrics from the database."""
-    if os.environ.get("USE_POSTGRES") == "true":
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM ping_metrics")
-        conn.commit()
-        conn.close()
-    elif os.environ.get("USE_LOCAL_DB") == "true":
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM ping_metrics")
-        conn.commit()
-        conn.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM ping_metrics")
+    conn.commit()
+    conn.close()
 
 def clear_speed_metrics():
     """Clear all speed metrics from the database."""
-    if os.environ.get("USE_POSTGRES") == "true":
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM speed_metrics")
-        conn.commit()
-        conn.close()
-    elif os.environ.get("USE_LOCAL_DB") == "true":
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM speed_metrics")
-        conn.commit()
-        conn.close()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM speed_metrics")
+    conn.commit()
+    conn.close()
