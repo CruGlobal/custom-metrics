@@ -26,13 +26,11 @@ class TestNetworkMonitor(unittest.TestCase):
         self.mock_open = self.open_patcher.start()
 
         self.requests_get_patcher = patch('main.requests.get')
-        self.requests_get_patcher.start()
+        self.mock_requests_get = self.requests_get_patcher.start()
 
         self.getenv_patcher = patch('main.os.getenv')
         self.mock_getenv = self.getenv_patcher.start()
         self.mock_getenv.side_effect = lambda key, default=None: {
-            'TURSO_DATABASE_URL': 'libsql://test.turso.io', 
-            'TURSO_AUTH_TOKEN': 'test-token',
             'PING_TABLE': 'test-ping',
             'SPEED_TABLE': 'test-speed',
             'PROMETHEUS_URL': 'http://test-prometheus:9090',
@@ -55,12 +53,24 @@ class TestNetworkMonitor(unittest.TestCase):
 
     def test_smoke(self):
         """Basic smoke test to verify test infrastructure."""
+        # Mock the ipinfo.io call
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "ip": "123.45.67.89",
+            "city": "Test City",
+            "region": "Test Region",
+            "country": "TC"
+        }
+        mock_response.raise_for_status.return_value = None
+        self.mock_requests_get.return_value = mock_response
+
         self.monitor = NetworkMonitor() # Initialize monitor for this test
         self.assertTrue(True)
         self.assertEqual(1 + 1, 2)
         self.assertIsNotNone(self.monitor)
         self.assertIsInstance(self.monitor, NetworkMonitor)
-        self.assertEqual(self.monitor.location, 'test-location')
+        self.assertEqual(self.monitor.location, 'Test City, Test Region, TC')
+        self.assertEqual(self.monitor.ip_address, '123.45.67.89')
 
     def test_get_or_create_site_id_existing(self):
         """Test getting existing site ID."""
@@ -92,7 +102,7 @@ class TestNetworkMonitor(unittest.TestCase):
             }
         }
         mock_response.raise_for_status.return_value = None
-        requests.get.return_value = mock_response
+        self.mock_requests_get.return_value = mock_response
 
         self.monitor = NetworkMonitor() # Initialize monitor for this test
         result = self.monitor._query_prometheus("test_query")
@@ -100,7 +110,7 @@ class TestNetworkMonitor(unittest.TestCase):
 
     def test_query_prometheus_failure(self):
         """Test failed Prometheus query."""
-        requests.get.side_effect = Exception("Connection error")
+        self.mock_requests_get.side_effect = Exception("Connection error")
         self.monitor = NetworkMonitor() # Initialize monitor for this test
         result = self.monitor._query_prometheus("test_query")
         self.assertIsNone(result)
@@ -133,44 +143,6 @@ class TestNetworkMonitor(unittest.TestCase):
         self.monitor._insert_speed_metrics(test_metrics)
         mock_insert_speed_metrics.assert_called_once()
 
-    @patch('database.get_turso_crud')
-    def test_insert_ping_metrics_type_mismatch(self, mock_get_turso_crud):
-        """Test ping metrics insertion with type mismatch."""
-        mock_crud = MagicMock()
-        mock_get_turso_crud.return_value = mock_crud
-
-        invalid_metrics = {
-            'google_up': "not a float",  # Invalid type
-            'apple_up': 1.0,
-            'github_up': 1.0,
-            'http_latency': 0.1,
-            'site_id': 'test-site',
-            'location': 'test-location'
-        }
-        
-        self.monitor = NetworkMonitor()
-        database.insert_ping_metrics(invalid_metrics)
-        mock_crud.create.assert_called_once()
-
-    @patch('database.get_turso_crud')
-    def test_insert_speed_metrics_type_mismatch(self, mock_get_turso_crud):
-        """Test speed metrics insertion with type mismatch."""
-        mock_crud = MagicMock()
-        mock_get_turso_crud.return_value = mock_crud
-
-        invalid_metrics = {
-            'download_mbps': "not a float",  # Invalid type
-            'upload_mbps': 336.0,
-            'ping_ms': 1.3,
-            'jitter_ms': 0.3,
-            'site_id': 'test-site',
-            'location': 'test-location'
-        }
-
-        self.monitor = NetworkMonitor()
-        database.insert_speed_metrics(invalid_metrics)
-        mock_crud.create.assert_called_once()
-
     @patch('database.insert_ping_metrics')
     def test_collect_ping_metrics(self, mock_insert_ping_metrics):
         """Test collecting ping metrics."""
@@ -185,7 +157,7 @@ class TestNetworkMonitor(unittest.TestCase):
             }
         }
         mock_response.raise_for_status.return_value = None
-        requests.get.return_value = mock_response
+        self.mock_requests_get.return_value = mock_response
 
         self.monitor = NetworkMonitor() # Initialize monitor for this test
         self.monitor.collect_ping_metrics()
@@ -207,7 +179,7 @@ class TestNetworkMonitor(unittest.TestCase):
             }
         }
         mock_response.raise_for_status.return_value = None
-        requests.get.return_value = mock_response
+        self.mock_requests_get.return_value = mock_response
 
         self.monitor = NetworkMonitor() # Initialize monitor for this test
         self.monitor.collect_speed_metrics()
@@ -215,66 +187,6 @@ class TestNetworkMonitor(unittest.TestCase):
         # Verify that insert_speed_metrics was called
         mock_insert_speed_metrics.assert_called_once()
 
-    @patch('database.get_all_ping_metrics')
-    @patch('database.get_all_speed_metrics')
-    @patch('database.clear_ping_metrics')
-    @patch('database.clear_speed_metrics')
-    @patch('database.get_turso_crud')
-    async def test_mass_upload_metrics(self, mock_get_turso_crud, mock_clear_speed_metrics, mock_clear_ping_metrics, mock_get_all_speed_metrics, mock_get_all_ping_metrics):
-        """Test uploading metrics."""
-        # Mock ping metrics data
-        mock_get_all_ping_metrics.return_value = [
-            {
-                'timestamp': '2023-01-01T00:00:00',
-                'site_id': 'test-site-id',
-                'location': 'test-location',
-                'google_up': '1.0',
-                'apple_up': '1.0',
-                'github_up': '1.0',
-                'pihole_up': '1.0',
-                'node_up': '1.0',
-                'speedtest_up': '1.0',
-                'http_latency': '0.1',
-                'http_samples': '100',
-                'http_time': '0.5',
-                'http_content_length': '1000',
-                'http_duration': '0.2'
-            }
-        ]
-        
-        # Mock speed metrics data
-        mock_get_all_speed_metrics.return_value = [
-            {
-                'timestamp': '2023-01-01T00:00:00',
-                'site_id': 'test-site-id',
-                'location': 'test-location',
-                'download_mbps': '291.0',
-                'upload_mbps': '336.0',
-                'ping_ms': '1.3',
-                'jitter_ms': '0.3'
-            }
-        ]
-        
-        mock_crud = MagicMock()
-        mock_get_turso_crud.return_value = mock_crud
-
-        # Call the method to test
-        self.monitor = NetworkMonitor() # Initialize monitor for this test
-        asyncio.run(self.monitor._mass_upload_metrics())
-        
-        # Verify that the methods were called
-        mock_get_all_ping_metrics.assert_called_once()
-        mock_get_all_speed_metrics.assert_called_once()
-        mock_get_turso_crud.assert_called_once()
-        
-        # Verify Turso CRUD create was called for each metric
-        self.assertEqual(mock_crud.create.call_count, 2)
-        mock_crud.create.assert_any_call("ping_metrics", mock_get_all_ping_metrics.return_value[0])
-        mock_crud.create.assert_any_call("speed_metrics", mock_get_all_speed_metrics.return_value[0])
-
-        mock_clear_ping_metrics.assert_called_once()
-        mock_clear_speed_metrics.assert_called_once()
-        
     @patch('database.get_all_ping_metrics')
     @patch('database.get_all_speed_metrics')
     @patch('database.clear_ping_metrics')
@@ -290,7 +202,7 @@ class TestNetworkMonitor(unittest.TestCase):
         # Call the method to test
         self.monitor = NetworkMonitor() # Initialize monitor for this test
         with patch.object(self.monitor, '_mass_upload_metrics') as mock_mass_upload_metrics:
-            asyncio.run(self.monitor.upload_metrics())
+            await self.monitor.upload_metrics()
             mock_mass_upload_metrics.assert_called_once()
 
 if __name__ == '__main__':
