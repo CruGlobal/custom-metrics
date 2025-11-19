@@ -2,12 +2,8 @@ services:
   custom-metrics:
     build: .
     environment:
-      - PROMETHEUS_URL=${PROMETHEUS_URL}
       - LOCATION=${LOCATION}
       - UPDATE_INTERVAL=${UPDATE_INTERVAL}
-      - TURSO_DATABASE_URL=${TURSO_DATABASE_URL}
-      - TURSO_AUTH_TOKEN=${TURSO_AUTH_TOKEN}
-      - USE_POSTGRES=${USE_POSTGRES}
       - PGHOST=${PGHOST}
       - PGDATABASE=${PGDATABASE}
       - PGUSER=${PGUSER}

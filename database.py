@@ -1,7 +1,5 @@
 import os
 from datetime import datetime
-from turso_python.connection import TursoConnection
-from turso_python.crud import TursoCRUD
 import sqlite3
 import psycopg
 
@@ -54,13 +52,10 @@ def get_db_connection():
         conn = sqlite3.connect(LOCAL_DB_PATH)
         conn.row_factory = sqlite3.Row
         return conn
-    else:
-        connection = TursoConnection()
-        return TursoCRUD(connection)
-
-def get_turso_crud():
-    connection = TursoConnection()
-    return TursoCRUD(connection)
+    # Fallback to local DB if no specific environment is set
+    conn = sqlite3.connect(LOCAL_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
 def _validate_metrics_data(data, schema):
     """Validate if the metrics data conforms to the expected schema types."""
@@ -150,46 +145,6 @@ def init_db():
         )
         conn.commit()
         conn.close()
-    else:
-        crud = get_turso_crud()
-        # Create ping_metrics table
-        crud.connection.execute_query("""
-            CREATE TABLE IF NOT EXISTS ping_metrics (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT,
-                site_id TEXT,
-                location TEXT,
-                ip_address TEXT,
-                google_up TEXT,
-                apple_up TEXT,
-                github_up TEXT,
-                pihole_up TEXT,
-                node_up TEXT,
-                speedtest_up TEXT,
-                http_latency TEXT,
-                http_samples TEXT,
-                http_time TEXT,
-                http_content_length TEXT,
-                http_duration TEXT
-            )
-        """
-        )
-        
-        # Create speed_metrics table
-        crud.connection.execute_query("""
-            CREATE TABLE IF NOT EXISTS speed_metrics (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp TEXT,
-                site_id TEXT,
-                location TEXT,
-                ip_address TEXT,
-                download_mbps TEXT,
-                upload_mbps TEXT,
-                ping_ms TEXT,
-                jitter_ms TEXT
-            )
-        """
-        )
 
 def insert_ping_metrics(metrics_data):
     """Insert ping metrics into the database."""
@@ -229,9 +184,6 @@ def insert_ping_metrics(metrics_data):
         cursor.execute(f"INSERT INTO ping_metrics ({columns}) VALUES ({placeholders})", data)
         conn.commit()
         conn.close()
-    else:
-        crud = get_turso_crud()
-        crud.create("ping_metrics", data)
 
 def insert_speed_metrics(metrics_data):
     """Insert speed metrics into the database."""
@@ -264,9 +216,6 @@ def insert_speed_metrics(metrics_data):
         cursor.execute(f"INSERT INTO speed_metrics ({columns}) VALUES ({placeholders})", data)
         conn.commit()
         conn.close()
-    else:
-        crud = get_turso_crud()
-        crud.create("speed_metrics", data)
 
 def get_all_ping_metrics():
     """Retrieve all ping metrics from the database."""
@@ -284,9 +233,6 @@ def get_all_ping_metrics():
         metrics = cursor.fetchall()
         conn.close()
         return metrics
-    else:
-        crud = get_turso_crud()
-        return crud.read("ping_metrics")
 
 def get_all_speed_metrics():
     """Retrieve all speed metrics from the database."""
@@ -304,9 +250,6 @@ def get_all_speed_metrics():
         metrics = cursor.fetchall()
         conn.close()
         return metrics
-    else:
-        crud = get_turso_crud()
-        return crud.read("speed_metrics")
 
 def clear_ping_metrics():
     """Clear all ping metrics from the database."""
@@ -322,9 +265,6 @@ def clear_ping_metrics():
         cursor.execute("DELETE FROM ping_metrics")
         conn.commit()
         conn.close()
-    else:
-        crud = get_turso_crud()
-        crud.connection.execute_query('DELETE FROM ping_metrics')
 
 def clear_speed_metrics():
     """Clear all speed metrics from the database."""
@@ -340,6 +280,3 @@ def clear_speed_metrics():
         cursor.execute("DELETE FROM speed_metrics")
         conn.commit()
         conn.close()
-    else:
-        crud = get_turso_crud()
-        crud.connection.execute_query('DELETE FROM speed_metrics')
