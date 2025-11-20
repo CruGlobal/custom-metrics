@@ -84,7 +84,7 @@ class NetworkMonitor:
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            logger.error(f"Failed to query Prometheus: {e}")
+            logger.error(f"Failed to query Prometheus: {e} at {prometheus_url}")
             return None
 
     def _ensure_float_values(self, metrics_data):
@@ -157,7 +157,7 @@ class NetworkMonitor:
         # First check if speedtest is up
         speedtest_up = self._query_prometheus(SPEED_METRICS['download_mbps'])
         if not speedtest_up or 'data' not in speedtest_up or not speedtest_up['data']['result']:
-            logger.info(f"No speedtest data found at {os.getenv("PROMETHEUS_URL", "http://prometheus:9090")}")
+            logger.info(f"No speedtest data found")
             return
         
         for metric_name, query in SPEED_METRICS.items():
