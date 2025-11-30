@@ -53,6 +53,14 @@ class TestNetworkMonitor(unittest.TestCase):
 
     def test_smoke(self):
         """Basic smoke test to verify test infrastructure."""
+        # Ensure LOCATION is not set from env for this specific test
+        original_side_effect = self.mock_getenv.side_effect
+        def side_effect(key, default=None):
+            if key == 'LOCATION':
+                return None
+            return original_side_effect(key, default)
+        self.mock_getenv.side_effect = side_effect
+
         # Mock the ipinfo.io call
         mock_response = MagicMock()
         mock_response.json.return_value = {
