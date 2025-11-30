@@ -48,17 +48,23 @@ class NetworkMonitor:
         
     def _get_ip_and_location(self):
         """Get public IP address and location."""
+        location = os.getenv("LOCATION")
         try:
             response = requests.get("https://ipinfo.io/json")
             response.raise_for_status()
             data = response.json()
             ip = data.get("ip")
+            if location:
+                return ip, location
+            
             city = data.get("city", "unknown")
             region = data.get("region", "unknown")
             country = data.get("country", "unknown")
             return ip, f"{city}, {region}, {country}"
         except Exception as e:
             logger.error(f"Failed to get IP and location: {e}")
+            if location:
+                return "unknown", location
             return "unknown", "unknown"
 
     def _get_or_create_site_id(self):
