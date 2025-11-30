@@ -182,7 +182,6 @@ class NetworkMonitor:
 import asyncio
 
 async def main():
-    # Initialize the database
     database.init_db()
     
     monitor = NetworkMonitor()

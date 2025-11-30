@@ -1,7 +1,19 @@
 import os
+import time # Added for retry mechanism
+import logging # Added for logging
 from datetime import datetime
-import sqlite3
 import psycopg
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Database retry configuration
+MAX_DB_RETRIES = 10
+DB_RETRY_DELAY_SECONDS = 10
 
 LOCAL_DB_PATH = "/data/metrics.db"
 # The connection string is now handled by environment variables
@@ -55,46 +67,62 @@ def _validate_metrics_data(data, schema):
             raise ValueError(f"Type mismatch for column '{key}'. Expected {expected_type}, got {type(data[key])}")
 
 def init_db():
-    """Initialize the database with tables for ping and speed metrics."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS ping_metrics (
-            id SERIAL PRIMARY KEY,
-            timestamp TEXT,
-            site_id TEXT,
-            location TEXT,
-            ip_address TEXT,
-            google_up TEXT,
-            apple_up TEXT,
-            github_up TEXT,
-            pihole_up TEXT,
-            node_up TEXT,
-            speedtest_up TEXT,
-            http_latency TEXT,
-            http_samples TEXT,
-            http_time TEXT,
-            http_content_length TEXT,
-            http_duration TEXT
-        )
-    """
-    )
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS speed_metrics (
-            id SERIAL PRIMARY KEY,
-            timestamp TEXT,
-            site_id TEXT,
-            location TEXT,
-            ip_address TEXT,
-            download_mbps TEXT,
-            upload_mbps TEXT,
-            ping_ms TEXT,
-            jitter_ms TEXT
-        )
-    """
-    )
-    conn.commit()
-    conn.close()
+    """Initialize the database with tables for ping and speed metrics with retry mechanism."""
+    for i in range(1, MAX_DB_RETRIES + 1):
+        try:
+            logger.info(f"Attempting to initialize database (Attempt {i}/{MAX_DB_RETRIES})...")
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS ping_metrics (
+                    id SERIAL PRIMARY KEY,
+                    timestamp TEXT,
+                    site_id TEXT,
+                    location TEXT,
+                    ip_address TEXT,
+                    google_up TEXT,
+                    apple_up TEXT,
+                    github_up TEXT,
+                    pihole_up TEXT,
+                    node_up TEXT,
+                    speedtest_up TEXT,
+                    http_latency TEXT,
+                    http_samples TEXT,
+                    http_time TEXT,
+                    http_content_length TEXT,
+                    http_duration TEXT
+                )
+            """
+            )
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS speed_metrics (
+                    id SERIAL PRIMARY KEY,
+                    timestamp TEXT,
+                    site_id TEXT,
+                    location TEXT,
+                    ip_address TEXT,
+                    download_mbps TEXT,
+                    upload_mbps TEXT,
+                    ping_ms TEXT,
+                    jitter_ms TEXT
+                )
+            """
+            )
+            conn.commit()
+            conn.close()
+            logger.info("Database initialized successfully.")
+            break # Exit loop if connection is successful
+        except psycopg.OperationalError as e:
+            logger.error(f"Database connection failed: {e}")
+            if i < MAX_DB_RETRIES:
+                logger.info(f"Retrying database connection in {DB_RETRY_DELAY_SECONDS} seconds...")
+                time.sleep(DB_RETRY_DELAY_SECONDS)
+            else:
+                logger.critical("Maximum database connection retries reached. Exiting.")
+                raise e
+        except Exception as e:
+            logger.critical(f"An unexpected error occurred during database initialization: {e}. Exiting.")
+            raise e
 
 def insert_ping_metrics(metrics_data):
     """Insert ping metrics into the database."""
