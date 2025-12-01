@@ -52,11 +52,12 @@ def get_db_connection():
     # Construct connection string explicitly from environment variables
     conn_string = (
         f"host={os.getenv('PGHOST')} "
+        f"port={os.getenv('PGPORT', 5432)} "
         f"user={os.getenv('PGUSER')} "
         f"password={os.getenv('PGPASSWORD')} "
         f"dbname={os.getenv('PGDATABASE')} "
         f"sslmode={os.getenv('PGSSLMODE')} "
-        f"channel_binding={os.getenv('PGCHANNELBINDING')} connect_timeout=500 PGPORT=5432"
+        f"channel_binding={os.getenv('PGCHANNELBINDING')} connect_timeout=500"
     )
     return psycopg.connect(conn_string)
 
