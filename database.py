@@ -51,12 +51,12 @@ SPEED_METRICS_SCHEMA = {
 def get_db_connection():
     # Construct connection string explicitly from environment variables
     conn_string = (
-        f"host={os.environ.get('PGHOST')} "
-        f"user={os.environ.get('PGUSER')} "
-        f"password={os.environ.get('PGPASSWORD')} "
-        f"dbname={os.environ.get('PGDATABASE')} "
-        f"sslmode={os.environ.get('PGSSLMODE')} "
-        f"channel_binding={os.environ.get('PGCHANNELBINDING')}"
+        f"host={os.getenv('PGHOST')} "
+        f"user={os.getenv('PGUSER')} "
+        f"password={os.getenv('PGPASSWORD')} "
+        f"dbname={os.getenv('PGDATABASE')} "
+        f"sslmode={os.getenv('PGSSLMODE')} "
+        f"channel_binding={os.getenv('PGCHANNELBINDING')}"
     )
     return psycopg.connect(conn_string)
 
