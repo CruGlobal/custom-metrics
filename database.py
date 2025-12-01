@@ -57,7 +57,7 @@ def get_db_connection():
         f"password={os.getenv('PGPASSWORD')} "
         f"dbname={os.getenv('PGDATABASE')} "
         f"sslmode={os.getenv('PGSSLMODE')} "
-        f"channel_binding={os.getenv('PGCHANNELBINDING')} connect_timeout=500"
+        f"channel_binding={os.getenv('PGCHANNELBINDING')} connect_timeout=2500"
     )
     return psycopg.connect(conn_string)
 
