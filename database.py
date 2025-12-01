@@ -49,9 +49,12 @@ SPEED_METRICS_SCHEMA = {
 }
 
 def get_db_connection():
+    # Neon db connection fix
+    DATABASE_URL = f"{os.getenv('PGHOST')}?sslaccept=strict&connect_timeout=500"
+
     # Construct connection string explicitly from environment variables
     conn_string = (
-        f"host={os.getenv('PGHOST')} "
+        f"host={DATABASE_URL} "
         f"user={os.getenv('PGUSER')} "
         f"password={os.getenv('PGPASSWORD')} "
         f"dbname={os.getenv('PGDATABASE')} "
