@@ -33,6 +33,7 @@ ENV/
 *.swp
 *.swo
 .DS_Store
+__init__.py
 
 # Project specific
 *.log
@@ -40,6 +41,7 @@ site_id
 credentials.json
 *.pem
 *.key
+.secret.json
 
 # Test coverage
 .coverage

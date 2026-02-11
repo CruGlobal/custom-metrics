@@ -2,7 +2,8 @@ import os
 import time # Added for retry mechanism
 import logging # Added for logging
 from datetime import datetime
-import psycopg
+import psycopg-binary
+import local_database
 
 # Configure logging
 logging.basicConfig(
@@ -59,7 +60,7 @@ def get_db_connection():
         f"sslmode={os.getenv('PGSSLMODE')} "
         f"channel_binding={os.getenv('PGCHANNELBINDING')} connect_timeout=2500"
     )
-    return psycopg.connect(conn_string)
+    return psycopg-binary.connect(conn_string)
 
 def _validate_metrics_data(data, schema):
     """Validate if the metrics data conforms to the expected schema types."""
@@ -113,7 +114,7 @@ def init_db():
             conn.close()
             logger.info("Database initialized successfully.")
             break # Exit loop if connection is successful
-        except psycopg.OperationalError as e:
+        except psycopg-binary.OperationalError as e:
             logger.error(f"Database connection failed: {e}")
             if i < MAX_DB_RETRIES:
                 logger.info(f"Retrying database connection in {DB_RETRY_DELAY_SECONDS} seconds...")
@@ -126,24 +127,8 @@ def init_db():
             raise e
 
 def insert_ping_metrics(metrics_data):
-    """Insert ping metrics into the database."""
-    data = {
-        'timestamp': datetime.utcnow().isoformat(),
-        'site_id': str(metrics_data.get('site_id')) if metrics_data.get('site_id') is not None else None,
-        'location': str(metrics_data.get('location')) if metrics_data.get('location') is not None else None,
-        'ip_address': str(metrics_data.get('ip_address')) if metrics_data.get('ip_address') is not None else None,
-        'google_up': str(metrics_data.get('google_up')) if metrics_data.get('google_up') is not None else None,
-        'apple_up': str(metrics_data.get('apple_up')) if metrics_data.get('apple_up') is not None else None,
-        'github_up': str(metrics_data.get('github_up')) if metrics_data.get('github_up') is not None else None,
-        'pihole_up': str(metrics_data.get('pihole_up')) if metrics_data.get('pihole_up') is not None else None,
-        'node_up': str(metrics_data.get('node_up')) if metrics_data.get('node_up') is not None else None,
-        'speedtest_up': str(metrics_data.get('speedtest_up')) if metrics_data.get('speedtest_up') is not None else None,
-        'http_latency': str(metrics_data.get('http_latency')) if metrics_data.get('http_latency') is not None else None,
-        'http_samples': str(metrics_data.get('http_samples')) if metrics_data.get('http_samples') is not None else None,
-        'http_time': str(metrics_data.get('http_time')) if metrics_data.get('http_time') is not None else None,
-        'http_content_length': str(metrics_data.get('http_content_length')) if metrics_data.get('http_content_length') is not None else None,
-        'http_duration': str(metrics_data.get('http_duration')) if metrics_data.get('http_duration') is not None else None
-    }
+    """Insert ping metrics from local into the cloud database."""
+    data = get_all_ping_metrics()
 
     _validate_metrics_data(data, PING_METRICS_SCHEMA)
 
@@ -179,13 +164,9 @@ def insert_speed_metrics(metrics_data):
     conn.close()
 
 def get_all_ping_metrics():
-    """Retrieve all ping metrics from the database."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM ping_metrics")
-    metrics = cursor.fetchall()
-    conn.close()
-    return metrics
+    """Retrieve all ping metrics from the local_database."""
+    data = local_database.get_all_ping_metrics()
+    return data
 
 def get_all_speed_metrics():
     """Retrieve all speed metrics from the database."""

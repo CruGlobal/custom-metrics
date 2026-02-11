@@ -3,8 +3,9 @@ import uuid
 import logging
 import schedule
 import requests
-from datetime import datetime
-import database
+from datetime import datetime, timedelta, UTC
+import remote_database
+import local_database
 
 # Configure logging
 logging.basicConfig(
@@ -104,38 +105,38 @@ class NetworkMonitor:
         return metrics_data
 
     def _insert_ping_metrics(self, metrics_data):
-        """Insert ping metrics directly into the database."""
+        """Insert ping metrics directly into the local_database."""
         try:
             # Add site_id and location to metrics_data
-            metrics_data['site_id'] = self.site_id
-            metrics_data['location'] = self.location
-            metrics_data['ip_address'] = self.ip_address
+            metrics_data["site_id"] = self.site_id
+            metrics_data["location"] = self.location
+            metrics_data["ip_address"] = self.ip_address
             
             # Ensure all numeric values are floats
             metrics_data = self._ensure_float_values(metrics_data)
 
             # Insert into the database
-            database.insert_ping_metrics(metrics_data)
-            logger.info("Successfully inserted ping metrics into the database")
+            local_database.insert_ping_metrics(metrics_data)
+            logger.info("Successfully inserted ping metrics into the local_database")
         except Exception as e:
-            logger.error(f"Error inserting ping metrics into the database: {e}")
+            logger.error(f"Error inserting ping metrics into the local_database: {e}")
 
     def _insert_speed_metrics(self, metrics_data):
         """Insert speedtest metrics directly into the database."""
         try:
             # Add site_id and location to metrics_data
-            metrics_data['site_id'] = self.site_id
-            metrics_data['location'] = self.location
-            metrics_data['ip_address'] = self.ip_address
+            metrics_data["site_id"] = self.site_id
+            metrics_data["location"] = self.location
+            metrics_data["ip_address"] = self.ip_address
             
             # Ensure all numeric values are floats
             metrics_data = self._ensure_float_values(metrics_data)
 
             # Insert into the database
-            database.insert_speed_metrics(metrics_data)
-            logger.info("Successfully inserted speed metrics into the database")
+            local_database.insert_speed_metrics(metrics_data)
+            logger.info("Successfully inserted speed metrics into the local_database")
         except Exception as e:
-            logger.error(f"Error inserting speed metrics into the database: {e}")
+            logger.error(f"Error inserting speed metrics into the local_database: {e}")
 
     def collect_ping_metrics(self):
         """Collect and store ping metrics."""
@@ -161,7 +162,7 @@ class NetworkMonitor:
         metrics_data = {}
         
         # First check if speedtest is up
-        speedtest_up = self._query_prometheus(SPEED_METRICS['download_mbps'])
+        speedtest_up = self._query_prometheus(SPEED_METRICS["download_mbps"])
         if not speedtest_up or 'data' not in speedtest_up or not speedtest_up['data']['result']:
             logger.info(f"No speedtest data found")
             return
@@ -178,24 +179,35 @@ class NetworkMonitor:
         
         if metrics_data:
             self._insert_speed_metrics(metrics_data)
+    
+    def check_sync(self):
+        if(local_database.get_if_need_to_sync((datetime.now(UTC) - timedelta(weeks=1)).isoformat())):
+           remote_database.init_db()
+           remote_database.insert_ping_metrics(local_database.get_ping_metrics_to_sync())
+           remote_database.insert_speed_metrics(local_database.get_speed_metrics_to_sync())
+           logger.info("Successfully synced metrics to remote database.")
+
 
 import asyncio
 
 async def main():
-    database.init_db()
+    local_database.init_db()
     
     monitor = NetworkMonitor()
     
     # Schedule ping metrics collection every 5 minutes
     schedule.every(5).minutes.do(monitor.collect_ping_metrics)
     
-    # Schedule speedtest metrics collection every 5 minutes
+    # Schedule speedtest metrics collection every 60 minutes
     # (it will only insert data if new speedtest results are available)
-    schedule.every(5).minutes.do(monitor.collect_speed_metrics)
+    schedule.every(60).minutes.do(monitor.collect_speed_metrics)
     
     # Run initial collection
     monitor.collect_ping_metrics()
     monitor.collect_speed_metrics()
+
+    # TODO check if we need to sync to remote
+    monitor.check_sync()
     
     # Keep the script running
     while True:

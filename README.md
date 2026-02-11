@@ -2,24 +2,6 @@
 
 A Python service that collects network metrics from Prometheus and stores them in BigQuery for analysis. The service monitors various network metrics including ping times to major services (Google, Apple, GitHub) and speedtest results.
 
-## Features
-
-- Automatic site ID generation and management
-- Prometheus metric collection
-- BigQuery data storage with separate tables for ping and speed metrics
-- Configurable metrics collection interval
-- Comprehensive logging
-- Ping monitoring for major services
-- Speedtest monitoring (download, upload, ping, jitter)
-
-## Prerequisites
-
-- Python 3.8 or higher
-- Google Cloud Platform account with BigQuery access
-- Prometheus instance running and accessible
-- Service account credentials for BigQuery access
-- Speedtest exporter running and accessible
-
 ## Setup
 
 1. Create a Python virtual environment:
@@ -35,15 +17,12 @@ source venv/bin/activate
 .\venv\Scripts\activate
 ```
 
-2. Install dependencies:
-
 ```bash
 pip3 install -r requirements.txt
 ```
+GOOGLE_APPLICATION_CREDENTIALS=./.secret.json python3 test_connection.py
 
-3. Set up environment variables:
-
-Create a `.env` file in the project root with the following variables:
+Create a `.env` file in the project root with the following variables
 
 ```bash
 BIGQUERY_PROJECT=your-project-id
@@ -56,43 +35,15 @@ LOCATION=your-location
 
 ## Running the Service
 
-Start the service:
-
 ```bash
 python3 main.py
 ```
-
-The service will:
-- Generate or retrieve a site ID
-- Connect to BigQuery
-- Start collecting ping metrics every 5 minutes
-- Check for and store speedtest metrics when available
-- Log all activities to the console
-
 ## Running Tests
-
-Run the test suite:
 
 ```bash
 # Run all tests
 python3 -m unittest test_network_monitor.py -v
-
-# Run a specific test
-python3 -m unittest test_network_monitor.TestNetworkMonitor.test_query_prometheus_success -v
 ```
-
-## Project Structure
-
-```
-.
-├── main.py              # Main service implementation
-├── test_network_monitor.py  # Test suite
-├── requirements.txt     # Python dependencies
-├── .env                # Environment variables (create this)
-└── README.md           # This file
-```
-
-## Metrics Collected
 
 ### Ping Metrics (collected every 5 minutes)
 - Service status (up/down) for:
@@ -108,14 +59,6 @@ python3 -m unittest test_network_monitor.TestNetworkMonitor.test_query_prometheu
   - Time
   - Content length
   - Duration
-
-### Speedtest Metrics (collected when available)
-- Download speed (Mbps)
-- Upload speed (Mbps)
-- Ping latency (ms)
-- Jitter (ms)
-
-## BigQuery Schema
 
 ### Ping Table Schema
 ```sql
