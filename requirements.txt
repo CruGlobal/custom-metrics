@@ -4,4 +4,4 @@ python-dotenv>=1.0.0
 google-cloud-bigquery
 psycopg
 # psycopg_c # this is Not compatable with raspi
-psycopg-binary
+# psycopg-binary
