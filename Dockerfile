@@ -16,6 +16,7 @@ RUN apt-get update && \
 RUN mkdir -p /app/config
 
 # Install dependencies
+RUN pip install --no-cache-dir --upgrade pip setuptools
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
