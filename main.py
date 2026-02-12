@@ -45,7 +45,7 @@ SPEED_METRICS = {
 class NetworkMonitor:
     def __init__(self):
         self.site_id = self._get_or_create_site_id()
-        self.ip_address, self.location = self._get_ip_and_location()
+        self.location = self._get_ip_and_location()
         
     def _get_ip_and_location(self):
         """Get public IP address and location."""
@@ -110,7 +110,6 @@ class NetworkMonitor:
             # Add site_id and location to metrics_data
             metrics_data["site_id"] = self.site_id
             metrics_data["location"] = self.location
-            metrics_data["ip_address"] = self.ip_address
             
             # Ensure all numeric values are floats
             metrics_data = self._ensure_float_values(metrics_data)
@@ -127,7 +126,6 @@ class NetworkMonitor:
             # Add site_id and location to metrics_data
             metrics_data["site_id"] = self.site_id
             metrics_data["location"] = self.location
-            metrics_data["ip_address"] = self.ip_address
             
             # Ensure all numeric values are floats
             metrics_data = self._ensure_float_values(metrics_data)
@@ -183,9 +181,21 @@ class NetworkMonitor:
     def check_sync(self):
         if(local_database.get_if_need_to_sync((datetime.now(UTC) - timedelta(weeks=1)).isoformat())):
            remote_database.init_db()
-           remote_database.insert_ping_metrics(local_database.get_ping_metrics_to_sync())
-           remote_database.insert_speed_metrics(local_database.get_speed_metrics_to_sync())
-           logger.info("Successfully synced metrics to remote database.")
+           ping_metrics_to_sync = local_database.get_ping_metrics_to_sync()
+           speed_metrics_to_sync = local_database.get_speed_metrics_to_sync()
+
+           if ping_metrics_to_sync:
+               remote_database.insert_ping_metrics(ping_metrics_to_sync)
+               local_database.mark_ping_metrics_as_synced([m["id"] for m in ping_metrics_to_sync])
+
+           if speed_metrics_to_sync:
+               remote_database.insert_speed_metrics(speed_metrics_to_sync)
+               local_database.mark_speed_metrics_as_synced([m["id"] for m in speed_metrics_to_sync])
+           
+           if ping_metrics_to_sync or speed_metrics_to_sync:
+               logger.info("Successfully synced metrics to remote database.")
+           else:
+               logger.info("No metrics to sync to remote database.")
 
 
 import asyncio

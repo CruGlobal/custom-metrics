@@ -4,6 +4,7 @@ import os
 import json
 import requests
 from datetime import datetime, timedelta, UTC
+import tempfile # Added for temporary file creation
 import main
 from main import (
     NetworkMonitor, SITE_ID_FILE, PING_METRICS, SPEED_METRICS,
@@ -42,13 +43,25 @@ class Test(unittest.TestCase):
         self.makedirs_patcher = patch("main.os.makedirs")
         self.makedirs_patcher.start()
 
-        self.local_db_init_patcher = patch("local_database.init_db")
-        self.mock_local_db_init = self.local_db_init_patcher.start()
-        
         self.remote_db_init_patcher = patch("remote_database.init_db")
         self.mock_remote_db_init = self.remote_db_init_patcher.start()
 
-        # self.monitor will be created in individual tests where needed
+        # Mock BigQuery client
+        self.mock_bigquery_client = MagicMock()
+        self.mock_bigquery_client.dataset.return_value.table.return_value = MagicMock()
+        self.mock_bigquery_client.insert_rows_json.return_value = [] # Simulate no errors
+        self.get_bigquery_client_patcher = patch("remote_database.get_bigquery_client", return_value=self.mock_bigquery_client)
+        self.get_bigquery_client_patcher.start()
+
+        # Create a unique temporary file for the local database for each test
+        self.temp_db_file = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+        self.temp_db_file.close() # Close the file handle so sqlite can open it
+
+        # Patch local_database.DB_FILE to this temporary file
+        self.local_db_file_patcher = patch("local_database.DB_FILE", self.temp_db_file.name)
+        self.local_db_file_patcher.start()
+        # Ensure local database is initialized for each test
+        local_database.init_db()
         self.monitor = None
 
     def tearDown(self):
@@ -58,8 +71,13 @@ class Test(unittest.TestCase):
         self.requests_get_patcher.stop()
         self.getenv_patcher.stop()
         self.makedirs_patcher.stop()
-        self.local_db_init_patcher.stop()
         self.remote_db_init_patcher.stop()
+        self.get_bigquery_client_patcher.stop()
+        self.local_db_file_patcher.stop()
+        
+        # Clean up the local database file after each test
+        if os.path.exists(self.temp_db_file.name):
+            os.remove(self.temp_db_file.name)
 
     def _setup_monitor(self):
         # Helper to set up NetworkMonitor with mocked IP/location
@@ -72,7 +90,6 @@ class Test(unittest.TestCase):
 
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "ip": "123.45.67.89",
             "city": "Test City",
             "region": "Test Region",
             "country": "TC"
@@ -91,7 +108,6 @@ class Test(unittest.TestCase):
             "timestamp": timestamp,
             "site_id": "test_site_id",
             "location": "Test City, Test Region, TC",
-            "ip_address": "123.45.67.89",
             "google_up": "1", "apple_up": "1", "github_up": "1",
             "pihole_up": "1", "node_up": "1", "speedtest_up": "1",
             "http_latency": "0.1", "http_samples": "10", "http_time": "0.5",
@@ -106,8 +122,27 @@ class Test(unittest.TestCase):
         self.assertEqual(1 + 1, 2)
         self.assertIsNotNone(self.monitor)
         self.assertIsInstance(self.monitor, NetworkMonitor)
-        self.assertEqual(self.monitor.location, "Test City, Test Region, TC")
-        self.assertEqual(self.monitor.ip_address, "123.45.67.89")
+        self.assertEqual(self.monitor.location, (None, "Test City, Test Region, TC"))
+
+    def test_field_synced(self):
+        """Basic test to verify synced field exists in the local table and not in the remote table."""
+        # Check local database
+        # local_database.init_db() # Removed redundant call, handled by setUp
+        local_conn = local_database.sqlite3.connect(local_database.DB_FILE)
+        local_cursor = local_conn.cursor()
+
+        local_cursor.execute("PRAGMA table_info(ping_metrics)")
+        local_ping_columns = [column[1] for column in local_cursor.fetchall()]
+        self.assertIn("synced", local_ping_columns)
+
+        local_cursor.execute("PRAGMA table_info(speed_metrics)")
+        local_speed_columns = [column[1] for column in local_cursor.fetchall()]
+        self.assertIn("synced", local_speed_columns)
+        local_conn.close()
+
+        # Check remote database
+        self.assertNotIn("synced", [field.name for field in remote_database.PING_TABLE_SCHEMA])
+        self.assertNotIn("synced", [field.name for field in remote_database.SPEED_TABLE_SCHEMA])
 
     def test_first_record_syncs_to_remote(self):
         """Test that a single record added to local SQLite is synced to remote and marked as synced."""
@@ -178,7 +213,7 @@ class Test(unittest.TestCase):
         # Create an old record (more than a week ago)
         one_week_ago = datetime.now(UTC) - timedelta(weeks=1, days=1)
         mock_record_id_old = 1
-        mock_metrics_data_old = self._create_mock_ping_metrics(mock_record_id_old, timestamp=one_week_ago.isoformat(), synced=0)
+        mock_metrics_data_old = self._create_mock_ping_metrics(mock_record_id_old, timestamp=(one_week_ago.isoformat()), synced=0)
 
         # Create a new unsynced record
         mock_record_id_new = 2

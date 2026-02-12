@@ -41,7 +41,6 @@ PING_TABLE_SCHEMA = [
     bigquery.SchemaField("timestamp", "STRING", mode="NULLABLE"),
     bigquery.SchemaField("site_id", "STRING", mode="NULLABLE"),
     bigquery.SchemaField("location", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("ip_address", "STRING", mode="NULLABLE"),
     bigquery.SchemaField("google_up", "STRING", mode="NULLABLE"),
     bigquery.SchemaField("apple_up", "STRING", mode="NULLABLE"),
     bigquery.SchemaField("github_up", "STRING", mode="NULLABLE"),
@@ -59,7 +58,6 @@ SPEED_TABLE_SCHEMA = [
     bigquery.SchemaField("timestamp", "STRING", mode="NULLABLE"),
     bigquery.SchemaField("site_id", "STRING", mode="NULLABLE"),
     bigquery.SchemaField("location", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("ip_address", "STRING", mode="NULLABLE"),
     bigquery.SchemaField("download_mbps", "STRING", mode="NULLABLE"),
     bigquery.SchemaField("upload_mbps", "STRING", mode="NULLABLE"),
     bigquery.SchemaField("ping_ms", "STRING", mode="NULLABLE"),
@@ -149,23 +147,25 @@ def insert_speed_metrics(metrics_data):
     bqc = get_bigquery_client()
     table_ref = bqc.dataset(DATASET_ID).table(SPEED_TABLE_ID)
 
-    # Prepare the data for insertion
-    row_to_insert = {
-        'timestamp': datetime.utcnow().isoformat(),
-        'site_id': str(metrics_data.get('site_id')) if metrics_data.get('site_id') is not None else None,
-        'location': str(metrics_data.get('location')) if metrics_data.get('location') is not None else None,
-        'ip_address': str(metrics_data.get('ip_address')) if metrics_data.get('ip_address') is not None else None,
-        'download_mbps': str(metrics_data.get('download_mbps')) if metrics_data.get('download_mbps') is not None else None,
-        'upload_mbps': str(metrics_data.get('upload_mbps')) if metrics_data.get('upload_mbps') is not None else None,
-        'ping_ms': str(metrics_data.get('ping_ms')) if metrics_data.get('ping_ms') is not None else None,
-        'jitter_ms': str(metrics_data.get('jitter_ms')) if metrics_data.get('jitter_ms') is not None else None
-    }
+    rows_to_insert = []
+    for metric in metrics_data:
+        row = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'site_id': str(metric.get('site_id')) if metric.get('site_id') is not None else None,
+            'location': str(metric.get('location')) if metric.get('location') is not None else None,
+            'download_mbps': str(metric.get('download_mbps')) if metric.get('download_mbps') is not None else None,
+            'upload_mbps': str(metric.get('upload_mbps')) if metric.get('upload_mbps') is not None else None,
+            'ping_ms': str(metric.get('ping_ms')) if metric.get('ping_ms') is not None else None,
+            'jitter_ms': str(metric.get('jitter_ms')) if metric.get('jitter_ms') is not None else None
+        }
+        rows_to_insert.append(row)
 
-    errors = bqc.insert_rows_json(table_ref, [row_to_insert])
-    if errors:
-        logger.error(f"Errors encountered while inserting speed metrics: {errors}")
-    else:
-        logger.info("Successfully inserted speed metrics into BigQuery.")
+    if rows_to_insert:
+        errors = bqc.insert_rows_json(table_ref, rows_to_insert)
+        if errors:
+            logger.error(f"Errors encountered while inserting speed metrics: {errors}")
+        else:
+            logger.info(f"Successfully inserted {len(rows_to_insert)} speed metrics into BigQuery.")
 
 def get_all_ping_metrics():
     """Retrieve all ping metrics from BigQuery."""

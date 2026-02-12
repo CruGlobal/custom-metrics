@@ -3,7 +3,7 @@
 import os
 import time # Added for retry mechanism
 import logging # Added for logging
-import psycopg # Kept psycopg as per feedback
+import sqlite3
 from datetime import datetime, timedelta, UTC # Added timedelta and UTC for date calculations
 
 # Database file path
@@ -11,7 +11,7 @@ DB_FILE = "metrics.db"
 
 def init_db():
     """Initialize the database with tables for ping and speed metrics."""
-    conn = psycopg.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
     # Create ping_metrics table
@@ -21,7 +21,6 @@ def init_db():
             timestamp TEXT,
             site_id TEXT,
             location TEXT,
-            ip_address TEXT,
             google_up TEXT,
             apple_up TEXT,
             github_up TEXT,
@@ -45,7 +44,6 @@ def init_db():
             timestamp TEXT,
             site_id TEXT,
             location TEXT,
-            ip_address TEXT,
             download_mbps TEXT,
             upload_mbps TEXT,
             ping_ms TEXT,
@@ -55,12 +53,22 @@ def init_db():
     """
     )
 
+    # Add synced column to speed_metrics if it doesn't exist
+    try:
+        cursor.execute("ALTER TABLE speed_metrics ADD COLUMN synced INTEGER DEFAULT 0")
+        logging.info("Added synced column to speed_metrics table.")
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" in str(e):
+            logging.info("synced column already exists in speed_metrics table.")
+        else:
+            raise e
+
     conn.commit()
     conn.close()
 
 def insert_ping_metrics(metrics_data):
     """Insert ping metrics into the database."""
-    conn = psycopg.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
     # Prepare the data for insertion
@@ -68,7 +76,6 @@ def insert_ping_metrics(metrics_data):
         "timestamp": datetime.now(UTC).isoformat(),
         "site_id": str(metrics_data.get("site_id")) if metrics_data.get("site_id") is not None else None,
         "location": str(metrics_data.get("location")) if metrics_data.get("location") is not None else None,
-        "ip_address": str(metrics_data.get("ip_address")) if metrics_data.get("ip_address") is not None else None,
         "google_up": str(metrics_data.get("google_up")) if metrics_data.get("google_up") is not None else None,
         "apple_up": str(metrics_data.get("apple_up")) if metrics_data.get("apple_up") is not None else None,
         "github_up": str(metrics_data.get("github_up")) if metrics_data.get("github_up") is not None else None,
@@ -85,22 +92,24 @@ def insert_ping_metrics(metrics_data):
     # Insert the data
     cursor.execute("""
         INSERT INTO ping_metrics (
-            timestamp, site_id, location, ip_address, google_up, apple_up, github_up, pihole_up, 
+            timestamp, site_id, location, google_up, apple_up, github_up, pihole_up, 
             node_up, speedtest_up, http_latency, http_samples, http_time, 
             http_content_length, http_duration, synced
         ) VALUES (
-            :timestamp, :site_id, :location, :ip_address, :google_up, :apple_up, :github_up, :pihole_up,
-            :node_up, :speedtest_up, :http_latency, :http_samples, :http_time,
-            :http_content_length, :http_duration, 0
+            ?, ?, ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?,
+            ?, ?, 0
         )
-    """, data)
+    """, (data["timestamp"], data["site_id"], data["location"],  data["google_up"], data["apple_up"], data["github_up"], data["pihole_up"],
+          data["node_up"], data["speedtest_up"], data["http_latency"], data["http_samples"], data["http_time"],
+          data["http_content_length"], data["http_duration"]))
     
     conn.commit()
     conn.close()
 
 def insert_speed_metrics(metrics_data):
     """Insert speed metrics into the database."""
-    conn = psycopg.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
     # Prepare the data for insertion
@@ -108,7 +117,6 @@ def insert_speed_metrics(metrics_data):
         "timestamp": datetime.now(UTC).isoformat(),
         "site_id": str(metrics_data.get("site_id")) if metrics_data.get("site_id") is not None else None,
         "location": str(metrics_data.get("location")) if metrics_data.get("location") is not None else None,
-        "ip_address": str(metrics_data.get("ip_address")) if metrics_data.get("ip_address") is not None else None,
         "download_mbps": str(metrics_data.get("download_mbps")) if metrics_data.get("download_mbps") is not None else None,
         "upload_mbps": str(metrics_data.get("upload_mbps")) if metrics_data.get("upload_mbps") is not None else None,
         "ping_ms": str(metrics_data.get("ping_ms")) if metrics_data.get("ping_ms") is not None else None,
@@ -118,13 +126,14 @@ def insert_speed_metrics(metrics_data):
     # Insert the data
     cursor.execute("""
         INSERT INTO speed_metrics (
-            timestamp, site_id, location, ip_address, download_mbps, 
+            timestamp, site_id, location, download_mbps, 
             upload_mbps, ping_ms, jitter_ms, synced
         ) VALUES (
-            :timestamp, :site_id, :location, :ip_address, :download_mbps,
-            :upload_mbps, :ping_ms, :jitter_ms, 0
+            ?, ?, ?, ?, ?,
+            ?, ?, ?, 0
         )
-    """, data)
+    """, (data["timestamp"], data["site_id"], data["location"],  data["download_mbps"],
+          data["upload_mbps"], data["ping_ms"], data["jitter_ms"]))
     
     conn.commit()
     conn.close()
@@ -134,10 +143,10 @@ def mark_ping_metrics_as_synced(metric_ids):
     if not metric_ids:
         return
 
-    conn = psycopg.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
-    placeholders = ", ".join(["%s"] * len(metric_ids)) # Changed to %s for psycopg
+    placeholders = ", ".join(["?"] * len(metric_ids)) # Changed to ? for sqlite3
     cursor.execute(f"""
         UPDATE ping_metrics
         SET synced = 1
@@ -152,10 +161,10 @@ def mark_speed_metrics_as_synced(metric_ids):
     if not metric_ids:
         return
 
-    conn = psycopg.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
-    placeholders = ", ".join(["%s"] * len(metric_ids)) # Changed to %s for psycopg
+    placeholders = ", ".join(["?"] * len(metric_ids)) # Changed to ? for sqlite3
     cursor.execute(f"""
         UPDATE speed_metrics
         SET synced = 1
@@ -169,26 +178,24 @@ def get_ping_metrics_to_sync():
     """Retrieve ping metrics that need to be synced from the database.
     Metrics are selected if they haven't been synced (synced=0) 
     """
-    conn = psycopg.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row # Enable dictionary-like access to rows
     cursor = conn.cursor()
 
     one_week_ago = (datetime.now(UTC) - timedelta(weeks=1)).isoformat()
     
     cursor.execute("""
-        SELECT id, timestamp, site_id, location, ip_address, google_up, apple_up, github_up, 
+        SELECT id, timestamp, site_id, location, google_up, apple_up, github_up, 
                pihole_up, node_up, speedtest_up, http_latency, http_samples, 
                http_time, http_content_length, http_duration, synced
         FROM ping_metrics
-        WHERE synced = 0 OR timestamp < %s
+        WHERE synced = 0 OR timestamp < ?
     """, (one_week_ago,))
     
     rows = cursor.fetchall()
     
-    # Get column names
-    column_names = [description[0] for description in cursor.description]
-    
-    # Convert rows to list of dictionaries
-    result = [dict(zip(column_names, row)) for row in rows]
+    # Convert rows to list of dictionaries (already handled by row_factory)
+    result = [dict(row) for row in rows]
     
     conn.close()
     return result
@@ -197,66 +204,61 @@ def get_speed_metrics_to_sync():
     """Retrieve speed metrics that need to be synced from the database.
     Metrics are selected if they haven't been synced (synced=0) 
     """
-    conn = psycopg.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row # Enable dictionary-like access to rows
     cursor = conn.cursor()
 
     one_week_ago = (datetime.now(UTC) - timedelta(weeks=1)).isoformat()
     
     cursor.execute("""
-        SELECT id, timestamp, site_id, location, ip_address, download_mbps, 
+        SELECT id, timestamp, site_id, location, download_mbps, 
             upload_mbps, ping_ms, jitter_ms, synced
         FROM speed_metrics
-        WHERE synced = 0 OR timestamp < %s
+        WHERE synced = 0 OR timestamp < ?
     """, (one_week_ago,))
     
     rows = cursor.fetchall()
     
-    # Get column names
-    column_names = [description[0] for description in cursor.description]
-    
-    # Convert rows to list of dictionaries
-    result = [dict(zip(column_names, row)) for row in rows]
+    # Convert rows to list of dictionaries (already handled by row_factory)
+    result = [dict(row) for row in rows]
     
     conn.close()
+    # Remote DOES NOT have `synced` column. Do not send
     return result
 
 def get_all_ping_metrics():
     """Retrieve all ping metrics from the database."""
-    conn = psycopg.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row # Enable dictionary-like access to rows
     cursor = conn.cursor()
     
     cursor.execute("SELECT * FROM ping_metrics")
     rows = cursor.fetchall()
     
-    # Get column names
-    column_names = [description[0] for description in cursor.description]
-    
-    # Convert rows to list of dictionaries
-    result = [dict(zip(column_names, row)) for row in rows]
+    # Convert rows to list of dictionaries (already handled by row_factory)
+    result = [dict(row) for row in rows]
     
     conn.close()
     return result
 
 def get_all_speed_metrics():
     """Retrieve all speed metrics from the database."""
-    conn = psycopg.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row # Enable dictionary-like access to rows
     cursor = conn.cursor()
     
     cursor.execute("SELECT * FROM speed_metrics")
     rows = cursor.fetchall()
     
-    # Get column names
-    column_names = [description[0] for description in cursor.description]
-    
-    # Convert rows to list of dictionaries
-    result = [dict(zip(column_names, row)) for row in rows]
+    # Convert rows to list of dictionaries (already handled by row_factory)
+    result = [dict(row) for row in rows]
     
     conn.close()
     return result
 
 def clear_ping_metrics():
     """Clear all ping metrics from the database."""
-    conn = psycopg.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
     cursor.execute("DELETE FROM ping_metrics")
@@ -266,7 +268,7 @@ def clear_ping_metrics():
 
 def clear_speed_metrics():
     """Clear all speed metrics from the database."""
-    conn = psycopg.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
     cursor.execute("DELETE FROM speed_metrics")
