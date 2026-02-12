@@ -2,7 +2,7 @@ import os
 import time # Added for retry mechanism
 import logging # Added for logging
 from datetime import datetime
-import psycopg-binary
+import psycopg
 import local_database
 
 # Configure logging
@@ -60,7 +60,7 @@ def get_db_connection():
         f"sslmode={os.getenv('PGSSLMODE')} "
         f"channel_binding={os.getenv('PGCHANNELBINDING')} connect_timeout=2500"
     )
-    return psycopg-binary.connect(conn_string)
+    return psycopg.connect(conn_string)
 
 def _validate_metrics_data(data, schema):
     """Validate if the metrics data conforms to the expected schema types."""
@@ -114,7 +114,7 @@ def init_db():
             conn.close()
             logger.info("Database initialized successfully.")
             break # Exit loop if connection is successful
-        except psycopg-binary.OperationalError as e:
+        except psycopg.OperationalError as e:
             logger.error(f"Database connection failed: {e}")
             if i < MAX_DB_RETRIES:
                 logger.info(f"Retrying database connection in {DB_RETRY_DELAY_SECONDS} seconds...")
