@@ -94,26 +94,14 @@ class NetworkMonitor:
             logger.error(f"Failed to query Prometheus: {e} at {prometheus_url}")
             return None
 
-    def _ensure_float_values(self, metrics_data):
-        """Ensure all numeric values in metrics_data are floats."""
-        for key, value in metrics_data.items():
-            if isinstance(value, str):
-                try:
-                    metrics_data[key] = float(value)
-                except ValueError:
-                    pass  # Keep as string if not a valid float
-        return metrics_data
-
     def _insert_ping_metrics(self, metrics_data):
         """Insert ping metrics directly into the local_database."""
         try:
             # Add site_id and location to metrics_data
             metrics_data["site_id"] = self.site_id
-            metrics_data["location"] = self.location
+            metrics_data["location"] = self.location[1] # Pass only the location string
+            metrics_data["ip_address"] = self.location[0] # Pass the IP address separately
             
-            # Ensure all numeric values are floats
-            metrics_data = self._ensure_float_values(metrics_data)
-
             # Insert into the database
             local_database.insert_ping_metrics(metrics_data)
             logger.info("Successfully inserted ping metrics into the local_database")
@@ -125,11 +113,8 @@ class NetworkMonitor:
         try:
             # Add site_id and location to metrics_data
             metrics_data["site_id"] = self.site_id
-            metrics_data["location"] = self.location
+            metrics_data["location"] = self.location[1] # Pass only the location string
             
-            # Ensure all numeric values are floats
-            metrics_data = self._ensure_float_values(metrics_data)
-
             # Insert into the database
             local_database.insert_speed_metrics(metrics_data)
             logger.info("Successfully inserted speed metrics into the local_database")
@@ -146,10 +131,11 @@ class NetworkMonitor:
             if result and 'data' in result and 'result' in result['data']:
                 for r in result['data']['result']:
                     value = float(r['value'][1])
-                    # Convert bits to Mbps for speed metrics
-                    if metric_name in ['download_mbps', 'upload_mbps']:
-                        value = value / 1_000_000
-                    metrics_data[metric_name] = value
+                    # Convert 'up' metrics to integer (0 or 1)
+                    if metric_name in ["google_up", "apple_up", "github_up", "pihole_up", "node_up", "speedtest_up"]:
+                        metrics_data[metric_name] = int(value)
+                    else:
+                        metrics_data[metric_name] = value
         
         if metrics_data:
             self._insert_ping_metrics(metrics_data)
@@ -160,8 +146,8 @@ class NetworkMonitor:
         metrics_data = {}
         
         # First check if speedtest is up
-        speedtest_up = self._query_prometheus(SPEED_METRICS["download_mbps"])
-        if not speedtest_up or 'data' not in speedtest_up or not speedtest_up['data']['result']:
+        speedtest_up_result = self._query_prometheus(SPEED_METRICS["download_mbps"])
+        if not speedtest_up_result or 'data' not in speedtest_up_result or not speedtest_up_result['data']['result']:
             logger.info(f"No speedtest data found")
             return
         
@@ -172,8 +158,9 @@ class NetworkMonitor:
                     value = float(r['value'][1])
                     # Convert bits to Mbps for speed metrics
                     if metric_name in ['download_mbps', 'upload_mbps']:
-                        value = value / 1_000_000
-                    metrics_data[metric_name] = value
+                        metrics_data[metric_name] = value / 1_000_000
+                    else:
+                        metrics_data[metric_name] = value
         
         if metrics_data:
             self._insert_speed_metrics(metrics_data)
@@ -197,8 +184,6 @@ class NetworkMonitor:
            else:
                logger.info("No metrics to sync to remote database.")
 
-
-import asyncio
 
 async def main():
     local_database.init_db()

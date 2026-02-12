@@ -234,3 +234,7 @@ class Test(unittest.TestCase):
             # Both old and new unsynced records should be sent
             mock_remote_insert_ping_metrics.assert_called_once_with([mock_metrics_data_old, mock_metrics_data_new])
             mock_mark_ping_metrics_as_synced.assert_called_once_with([mock_record_id_old, mock_record_id_new])
+
+
+if __name__ == '__main__':
+    unittest.main()

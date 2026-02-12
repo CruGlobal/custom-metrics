@@ -21,17 +21,17 @@ def init_db():
             timestamp TEXT,
             site_id TEXT,
             location TEXT,
-            google_up TEXT,
-            apple_up TEXT,
-            github_up TEXT,
-            pihole_up TEXT,
-            node_up TEXT,
-            speedtest_up TEXT,
-            http_latency TEXT,
-            http_samples TEXT,
-            http_time TEXT,
-            http_content_length TEXT,
-            http_duration TEXT,
+            google_up INTEGER,
+            apple_up INTEGER,
+            github_up INTEGER,
+            pihole_up INTEGER,
+            node_up INTEGER,
+            speedtest_up INTEGER,
+            http_latency REAL,
+            http_samples REAL,
+            http_time REAL,
+            http_content_length REAL,
+            http_duration REAL,
             synced INTEGER DEFAULT 0
         )
     """
@@ -44,10 +44,10 @@ def init_db():
             timestamp TEXT,
             site_id TEXT,
             location TEXT,
-            download_mbps TEXT,
-            upload_mbps TEXT,
-            ping_ms TEXT,
-            jitter_ms TEXT,
+            download_mbps REAL,
+            upload_mbps REAL,
+            ping_ms REAL,
+            jitter_ms REAL,
             synced INTEGER DEFAULT 0
         )
     """
@@ -76,17 +76,17 @@ def insert_ping_metrics(metrics_data):
         "timestamp": datetime.now(UTC).isoformat(),
         "site_id": str(metrics_data.get("site_id")) if metrics_data.get("site_id") is not None else None,
         "location": str(metrics_data.get("location")) if metrics_data.get("location") is not None else None,
-        "google_up": str(metrics_data.get("google_up")) if metrics_data.get("google_up") is not None else None,
-        "apple_up": str(metrics_data.get("apple_up")) if metrics_data.get("apple_up") is not None else None,
-        "github_up": str(metrics_data.get("github_up")) if metrics_data.get("github_up") is not None else None,
-        "pihole_up": str(metrics_data.get("pihole_up")) if metrics_data.get("pihole_up") is not None else None,
-        "node_up": str(metrics_data.get("node_up")) if metrics_data.get("node_up") is not None else None,
-        "speedtest_up": str(metrics_data.get("speedtest_up")) if metrics_data.get("speedtest_up") is not None else None,
-        "http_latency": str(metrics_data.get("http_latency")) if metrics_data.get("http_latency") is not None else None,
-        "http_samples": str(metrics_data.get("http_samples")) if metrics_data.get("http_samples") is not None else None,
-        "http_time": str(metrics_data.get("http_time")) if metrics_data.get("http_time") is not None else None,
-        "http_content_length": str(metrics_data.get("http_content_length")) if metrics_data.get("http_content_length") is not None else None,
-        "http_duration": str(metrics_data.get("http_duration")) if metrics_data.get("http_duration") is not None else None
+        "google_up": metrics_data.get("google_up"),
+        "apple_up": metrics_data.get("apple_up"),
+        "github_up": metrics_data.get("github_up"),
+        "pihole_up": metrics_data.get("pihole_up"),
+        "node_up": metrics_data.get("node_up"),
+        "speedtest_up": metrics_data.get("speedtest_up"),
+        "http_latency": metrics_data.get("http_latency"),
+        "http_samples": metrics_data.get("http_samples"),
+        "http_time": metrics_data.get("http_time"),
+        "http_content_length": metrics_data.get("http_content_length"),
+        "http_duration": metrics_data.get("http_duration")
     }
     
     # Insert the data
@@ -117,10 +117,10 @@ def insert_speed_metrics(metrics_data):
         "timestamp": datetime.now(UTC).isoformat(),
         "site_id": str(metrics_data.get("site_id")) if metrics_data.get("site_id") is not None else None,
         "location": str(metrics_data.get("location")) if metrics_data.get("location") is not None else None,
-        "download_mbps": str(metrics_data.get("download_mbps")) if metrics_data.get("download_mbps") is not None else None,
-        "upload_mbps": str(metrics_data.get("upload_mbps")) if metrics_data.get("upload_mbps") is not None else None,
-        "ping_ms": str(metrics_data.get("ping_ms")) if metrics_data.get("ping_ms") is not None else None,
-        "jitter_ms": str(metrics_data.get("jitter_ms")) if metrics_data.get("jitter_ms") is not None else None
+        "download_mbps": metrics_data.get("download_mbps"),
+        "upload_mbps": metrics_data.get("upload_mbps"),
+        "ping_ms": metrics_data.get("ping_ms"),
+        "jitter_ms": metrics_data.get("jitter_ms")
     }
     
     # Insert the data

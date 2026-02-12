@@ -38,30 +38,30 @@ def get_bigquery_client():
 
 # Define BigQuery schemas
 PING_TABLE_SCHEMA = [
-    bigquery.SchemaField("timestamp", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("site_id", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("location", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("google_up", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("apple_up", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("github_up", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("pihole_up", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("node_up", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("speedtest_up", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("http_latency", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("http_samples", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("http_time", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("http_content_length", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("http_duration", "STRING", mode="NULLABLE"),
+    bigquery.SchemaField("timestamp", "TIMESTAMP", mode="NULLABLE"), # TIMESTAMP
+    bigquery.SchemaField("site_id", "STRING", mode="NULLABLE"), # STRING
+    bigquery.SchemaField("location", "STRING", mode="NULLABLE"), # STRING
+    bigquery.SchemaField("google_up", "NUMERIC", mode="NULLABLE"), # NUMERIC
+    bigquery.SchemaField("apple_up", "NUMERIC", mode="NULLABLE"), # NUMERIC
+    bigquery.SchemaField("github_up", "NUMERIC", mode="NULLABLE"), # NUMERIC
+    bigquery.SchemaField("pihole_up", "NUMERIC", mode="NULLABLE"),# NUMERIC
+    bigquery.SchemaField("node_up", "NUMERIC", mode="NULLABLE"),# NUMERIC
+    bigquery.SchemaField("speedtest_up", "NUMERIC", mode="NULLABLE"),# NUMERIC
+    bigquery.SchemaField("http_latency", "NUMERIC", mode="NULLABLE"),# NUMERIC
+    bigquery.SchemaField("http_samples", "NUMERIC", mode="NULLABLE"),# NUMERIC
+    bigquery.SchemaField("http_time", "NUMERIC", mode="NULLABLE"),# NUMERIC
+    bigquery.SchemaField("http_content_length", "NUMERIC", mode="NULLABLE"),# NUMERIC
+    bigquery.SchemaField("http_duration", "NUMERIC", mode="NULLABLE"),# NUMERIC
 ]
 
 SPEED_TABLE_SCHEMA = [
-    bigquery.SchemaField("timestamp", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("site_id", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("location", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("download_mbps", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("upload_mbps", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("ping_ms", "STRING", mode="NULLABLE"),
-    bigquery.SchemaField("jitter_ms", "STRING", mode="NULLABLE"),
+    bigquery.SchemaField("timestamp", "TIMESTAMP", mode="NULLABLE"), # TIMESTAMP
+    bigquery.SchemaField("site_id", "STRING", mode="NULLABLE"), # STRING
+    bigquery.SchemaField("location", "STRING", mode="NULLABLE"), # STRING
+    bigquery.SchemaField("download_mbps", "NUMERIC", mode="NULLABLE"),# NUMERIC
+    bigquery.SchemaField("upload_mbps", "NUMERIC", mode="NULLABLE"),# NUMERIC
+    bigquery.SchemaField("ping_ms", "NUMERIC", mode="NULLABLE"),# NUMERIC
+    bigquery.SchemaField("jitter_ms", "NUMERIC", mode="NULLABLE"),# NUMERIC
 ]
 
 def init_db():
@@ -129,8 +129,22 @@ def insert_ping_metrics():
     metric_ids_to_mark_synced = []
 
     for metric in metrics_to_sync:
-        # Exclude 'id' and 'synced' fields, as they are local database specific
-        row = {k: v for k, v in metric.items() if k not in ['id', 'synced']}
+        row = {
+            "timestamp": datetime.fromisoformat(metric["timestamp"]) if metric.get("timestamp") else None,
+            "site_id": metric.get("site_id"),
+            "location": metric.get("location"),
+            "google_up": metric.get("google_up"),
+            "apple_up": metric.get("apple_up"),
+            "github_up": metric.get("github_up"),
+            "pihole_up": metric.get("pihole_up"),
+            "node_up": metric.get("node_up"),
+            "speedtest_up": metric.get("speedtest_up"),
+            "http_latency": metric.get("http_latency"),
+            "http_samples": metric.get("http_samples"),
+            "http_time": metric.get("http_time"),
+            "http_content_length": metric.get("http_content_length"),
+            "http_duration": metric.get("http_duration"),
+        }
         rows_to_insert.append(row)
         metric_ids_to_mark_synced.append(metric['id'])
 
@@ -150,13 +164,13 @@ def insert_speed_metrics(metrics_data):
     rows_to_insert = []
     for metric in metrics_data:
         row = {
-            'timestamp': datetime.utcnow().isoformat(),
-            'site_id': str(metric.get('site_id')) if metric.get('site_id') is not None else None,
-            'location': str(metric.get('location')) if metric.get('location') is not None else None,
-            'download_mbps': str(metric.get('download_mbps')) if metric.get('download_mbps') is not None else None,
-            'upload_mbps': str(metric.get('upload_mbps')) if metric.get('upload_mbps') is not None else None,
-            'ping_ms': str(metric.get('ping_ms')) if metric.get('ping_ms') is not None else None,
-            'jitter_ms': str(metric.get('jitter_ms')) if metric.get('jitter_ms') is not None else None
+            'timestamp': datetime.fromisoformat(metric["timestamp"]) if metric.get("timestamp") else None,
+            'site_id': metric.get('site_id'),
+            'location': metric.get('location'),
+            'download_mbps': metric.get('download_mbps'),
+            'upload_mbps': metric.get('upload_mbps'),
+            'ping_ms': metric.get('ping_ms'),
+            'jitter_ms': metric.get('jitter_ms')
         }
         rows_to_insert.append(row)
 

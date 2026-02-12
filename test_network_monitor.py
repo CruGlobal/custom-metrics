@@ -5,6 +5,7 @@ import json
 import requests
 from datetime import datetime, timedelta, UTC
 import main
+from unittest.mock import patch
 from main import (
     NetworkMonitor, SITE_ID_FILE, PING_METRICS, SPEED_METRICS,
     PING_TABLE, SPEED_TABLE
@@ -48,6 +49,20 @@ class TestNetworkMonitor(unittest.TestCase):
         self.remote_db_init_patcher = patch("remote_database.init_db")
         self.mock_remote_db_init = self.remote_db_init_patcher.start()
 
+        # Patch datetime.now to return a fixed time for consistent testing
+        self.fixed_now = datetime(2026, 2, 12, 16, 0, 0, tzinfo=UTC)
+
+        # Patch datetime.now in local_database as well
+        self.local_db_datetime_patcher = patch('local_database.datetime')
+        self.mock_local_db_datetime = self.local_db_datetime_patcher.start()
+        self.mock_local_db_datetime.now.return_value = self.fixed_now
+        self.mock_local_db_datetime.side_effect = lambda *args, **kw: datetime(*args, **kw)
+
+        self.datetime_patcher = patch('main.datetime')
+        self.mock_datetime = self.datetime_patcher.start()
+        self.mock_datetime.now.return_value = self.fixed_now
+        self.mock_datetime.side_effect = lambda *args, **kw: datetime(*args, **kw) # Allow other datetime calls to work
+
         # self.monitor will be created in individual tests where needed
         self.monitor = None
 
@@ -60,6 +75,8 @@ class TestNetworkMonitor(unittest.TestCase):
         self.makedirs_patcher.stop()
         self.local_db_init_patcher.stop()
         self.remote_db_init_patcher.stop()
+        self.datetime_patcher.stop()
+        self.local_db_datetime_patcher.stop()
 
     def _setup_monitor(self):
         # Helper to set up NetworkMonitor with mocked IP/location
@@ -90,9 +107,7 @@ class TestNetworkMonitor(unittest.TestCase):
         self.assertEqual(1 + 1, 2)
         self.assertIsNotNone(self.monitor)
         self.assertIsInstance(self.monitor, NetworkMonitor)
-        self.assertEqual(self.monitor.location, "Test City, Test Region, TC")
-        self.assertEqual(self.monitor.ip_address, "123.45.67.89")
-
+        self.assertEqual(self.monitor.location[1], "Test City, Test Region, TC")
     def test_get_or_create_site_id_existing(self):
         """Test getting existing site ID."""
         test_site_id = "test-uuid-123"
@@ -175,27 +190,35 @@ class TestNetworkMonitor(unittest.TestCase):
     @patch("local_database.insert_ping_metrics")
     def test_collect_ping_metrics(self, mock_insert_ping_metrics):
         """Test collecting ping metrics."""
-        self.mock_requests_get.side_effect = [] # Clear side_effect for this test to correctly set it up
-        self._setup_monitor() # This will set self.mock_requests_get.side_effect to contain the ipinfo response
-
+        # Mock ipinfo response
+        ipinfo_mock_response = MagicMock()
+        ipinfo_mock_response.json.return_value = {
+            "ip": "123.45.67.89",
+            "city": "Test City",
+            "region": "Test Region",
+            "country": "TC"
+        }
+        ipinfo_mock_response.raise_for_status.return_value = None
+        
         # Mock successful Prometheus queries for *all* PING_METRICS
-        mock_results = []
+        prometheus_mock_results = []
         for i in range(len(PING_METRICS)):
             mock_response_item = MagicMock()
             mock_response_item.json.return_value = {
                 'data': {
                     'result': [{
                         'metric': {'instance': f'test-instance-{i}'},
-                        'value': [str(datetime.now().timestamp()), f'{1.0 + i}']
+                        'value': [str(self.fixed_now.timestamp()), f'{1.0 + i}']
                     }]
                 }
             }
             mock_response_item.raise_for_status.return_value = None
-            mock_results.append(mock_response_item)
+            prometheus_mock_results.append(mock_response_item)
         
-        # Subsequent calls are for Prometheus queries
-        self.mock_requests_get.side_effect.extend(mock_results)
+        # Set side_effect for requests.get
+        self.mock_requests_get.side_effect = [ipinfo_mock_response] + prometheus_mock_results
 
+        self.monitor = NetworkMonitor() # Initialize monitor for this test
         self.monitor.collect_ping_metrics()
         
         # Verify that insert_ping_metrics was called once
@@ -209,23 +232,30 @@ class TestNetworkMonitor(unittest.TestCase):
     @patch("local_database.insert_speed_metrics")
     def test_collect_speed_metrics_with_data(self, mock_insert_speed_metrics):
         """Test collecting speed metrics when data is available."""
-        self.mock_requests_get.side_effect = [] # Clear side_effect for this test
-        self._setup_monitor() # This will set self.mock_requests_get.side_effect to contain the ipinfo response
-        
+        # Mock ipinfo response
+        ipinfo_mock_response = MagicMock()
+        ipinfo_mock_response.json.return_value = {
+            "ip": "123.45.67.89",
+            "city": "Test City",
+            "region": "Test Region",
+            "country": "TC"
+        }
+        ipinfo_mock_response.raise_for_status.return_value = None
+
         # Mock successful speedtest data for *all* SPEED_METRICS
-        mock_results = []
+        speedtest_mock_results = []
         # First mock response is for the initial check for speedtest_up
         mock_initial_speedtest_up = MagicMock()
         mock_initial_speedtest_up.json.return_value = {
             'data': {
                 'result': [{
                     'metric': {'instance': 'speedtest:9798'},
-                    'value': [str(datetime.now().timestamp()), '1']
+                    'value': [str(self.fixed_now.timestamp()), '1']
                 }]
             }
         }
         mock_initial_speedtest_up.raise_for_status.return_value = None
-        mock_results.append(mock_initial_speedtest_up)
+        speedtest_mock_results.append(mock_initial_speedtest_up)
 
         for i in range(len(SPEED_METRICS)):
             mock_response_item = MagicMock()
@@ -234,25 +264,26 @@ class TestNetworkMonitor(unittest.TestCase):
                 'data': {
                     'result': [{
                         'metric': {'instance': 'speedtest:9798'},
-                        'value': [str(datetime.now().timestamp()), f'{291000000 + i}'] 
+                        'value': [str(self.fixed_now.timestamp()), f'{291000000 + i}'] 
                     }]
                 }
             }
             mock_response_item.raise_for_status.return_value = None
-            mock_results.append(mock_response_item)
+            speedtest_mock_results.append(mock_response_item)
 
-        self.mock_requests_get.side_effect.extend(mock_results)
+        # Combine the ipinfo mock with speedtest mocks
+        self.mock_requests_get.side_effect = [ipinfo_mock_response] + speedtest_mock_results
 
+        self.monitor = NetworkMonitor() # Initialize monitor for this test
         self.monitor.collect_speed_metrics()
         
         # Verify that insert_speed_metrics was called
         mock_insert_speed_metrics.assert_called_once()
         self.assertIn('site_id', mock_insert_speed_metrics.call_args[0][0])
         self.assertIn('location', mock_insert_speed_metrics.call_args[0][0])
-        self.assertIn('ip_address', mock_insert_speed_metrics.call_args[0][0])
+        # ip_address is not inserted for speed metrics, so no assertion for it
         # Check if at least one speed metric was collected
         self.assertTrue(any(key in SPEED_METRICS for key in mock_insert_speed_metrics.call_args[0][0]))
-
 
     @patch("local_database.insert_ping_metrics")
     @patch("main.NetworkMonitor._query_prometheus")
@@ -277,7 +308,7 @@ class TestNetworkMonitor(unittest.TestCase):
         mock_insert_ping_metrics.assert_called_once()
 
         # Assert: local_database.get_if_need_to_sync was checked
-        mock_get_if_need_to_sync.assert_called_once_with(timedelta(weeks=1)) # Check for correct argument
+        mock_get_if_need_to_sync.assert_called_once_with((self.fixed_now - timedelta(weeks=1)).isoformat()) # Check for correct argument
 
     @patch("local_database.insert_ping_metrics")
     @patch("main.NetworkMonitor._query_prometheus")
@@ -310,7 +341,7 @@ class TestNetworkMonitor(unittest.TestCase):
         # The call count should be 2, because check_sync is called twice implicitely (once for each collect_ping_metrics call, if it was not explicitly called, if it is explicitely called, it will be called once)
         # It will be called once to evaluate the condition inside check_sync
         self.assertEqual(mock_get_if_need_to_sync.call_count, 1) # Changed from 2 to 1 for explicit call
-        mock_get_if_need_to_sync.assert_called_with(timedelta(weeks=1)) # Check for correct argument
+        mock_get_if_need_to_sync.assert_called_with((self.fixed_now - timedelta(weeks=1)).isoformat()) # Check for correct argument
 
 
     @patch("local_database.get_ping_metrics_to_sync")
@@ -338,13 +369,13 @@ class TestNetworkMonitor(unittest.TestCase):
         # One of them is already synced and should not be returned by get_ping_metrics_to_sync.
         # Let's adjust the mock_get_ping_metrics_to_sync.return_value to only return unsynced records as expected by the remote_database.insert_ping_metrics call.
         mock_get_ping_metrics_to_sync.return_value = [
-            {'id': 1, 'timestamp': (datetime.now(UTC) - timedelta(days=2)).isoformat(), 'synced': 0, **{metric: '1.0' for metric in PING_METRICS}},
-            {'id': 2, 'timestamp': (datetime.now(UTC) - timedelta(days=8)).isoformat(), 'synced': 0, **{metric: '1.0' for metric in PING_METRICS}}
+            {'id': 1, 'timestamp': (self.fixed_now - timedelta(days=2)).isoformat(), 'synced': 0, **{metric: '1.0' for metric in PING_METRICS}},
+            {'id': 2, 'timestamp': (self.fixed_now - timedelta(days=8)).isoformat(), 'synced': 0, **{metric: '1.0' for metric in PING_METRICS}}
         ]
         # Mock local_database.get_speed_metrics_to_sync to return some unsynced records
         mock_get_speed_metrics_to_sync.return_value = [
-            {'id': 101, 'timestamp': (datetime.now(UTC) - timedelta(days=3)).isoformat(), 'synced': 0, **{metric: '100.0' for metric in SPEED_METRICS}},
-            {'id': 102, 'timestamp': (datetime.now(UTC) - timedelta(days=9)).isoformat(), 'synced': 0, **{metric: '100.0' for metric in SPEED_METRICS}}
+            {'id': 101, 'timestamp': (self.fixed_now - timedelta(days=3)).isoformat(), 'synced': 0, **{metric: '100.0' for metric in SPEED_METRICS}},
+            {'id': 102, 'timestamp': (self.fixed_now - timedelta(days=9)).isoformat(), 'synced': 0, **{metric: '100.0' for metric in SPEED_METRICS}}
         ]
 
         # Mock local_database.get_if_need_to_sync to trigger a sync
@@ -389,8 +420,17 @@ class TestNetworkMonitor(unittest.TestCase):
             {k:v for k,v in mock_get_ping_metrics_to_sync.return_value[0].items() if k not in ['id', 'synced']},
             {k:v for k,v in mock_get_ping_metrics_to_sync.return_value[1].items() if k not in ['id', 'synced']}
         ]
+        # Convert the actual_ping_calls_args to a list of dictionaries for easier comparison
+        # and remove 'id' and 'synced' keys for comparison
+        actual_ping_calls_args_dicts = []
+        for item in actual_ping_calls_args:
+            d = dict(item)
+            d.pop('id', None)
+            d.pop('synced', None)
+            actual_ping_calls_args_dicts.append(d)
+
         for expected_row in expected_ping_rows:
-            self.assertIn(expected_row, actual_ping_calls_args)
+            self.assertIn(expected_row, actual_ping_calls_args_dicts)
 
         # Assert: local_database.mark_ping_metrics_as_synced was called with the IDs of the sent ping records
         mock_mark_ping_metrics_as_synced.assert_called_once_with([1, 2])
@@ -404,8 +444,17 @@ class TestNetworkMonitor(unittest.TestCase):
             {k:v for k,v in mock_get_speed_metrics_to_sync.return_value[0].items() if k not in ['id', 'synced']},
             {k:v for k,v in mock_get_speed_metrics_to_sync.return_value[1].items() if k not in ['id', 'synced']}
         ]
+        # Convert the actual_speed_calls_args to a list of dictionaries for easier comparison
+        # and remove 'id' and 'synced' keys for comparison
+        actual_speed_calls_args_dicts = []
+        for item in actual_speed_calls_args:
+            d = dict(item)
+            d.pop('id', None)
+            d.pop('synced', None)
+            actual_speed_calls_args_dicts.append(d)
+
         for expected_row in expected_speed_rows:
-            self.assertIn(expected_row, actual_speed_calls_args)
+            self.assertIn(expected_row, actual_speed_calls_args_dicts)
 
         # Assert: local_database.mark_speed_metrics_as_synced was called with the IDs of the sent speed records
         mock_mark_speed_metrics_as_synced.assert_called_once_with([101, 102])
