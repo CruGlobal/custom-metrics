@@ -94,11 +94,10 @@ def insert_ping_metrics(metrics_data):
         INSERT INTO ping_metrics (
             timestamp, site_id, location, google_up, apple_up, github_up, pihole_up, 
             node_up, speedtest_up, http_latency, http_samples, http_time, 
-            http_content_length, http_duration, synced
+            http_content_length, http_duration
         ) VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, 0
+            ?, ?, ?, ?, ?, ?
         )
     """, (data["timestamp"], data["site_id"], data["location"],  data["google_up"], data["apple_up"], data["github_up"], data["pihole_up"],
           data["node_up"], data["speedtest_up"], data["http_latency"], data["http_samples"], data["http_time"],
@@ -276,17 +275,37 @@ def clear_speed_metrics():
     conn.commit()
     conn.close()
 
-def get_not_synced():
-    return True
-def get_if_need_to_sync(time):
-    return True
+def get_never_synced():
+    """
+    No records have ever been successfully synced.
+    """
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM speed_metrics WHERE synced = 1")
+    count = cursor.fetchone()[0]
+    conn.close()
+    return count == 0
 
-# Need to sync?
-def get_if_need_to_sync(time):
-    # This function is called from main.py, not remote_database.py
-    # The parameter `time` is expected to be a timedelta object.
-    # The existing implementation of get_not_synced and get_if_need_to_syc always return True.
-    # For the purpose of the mock tests, we will assume this logic is as intended
-    # and the time parameter is just passed along. The actual logic for determining
-    # if a sync is needed would be more complex and involve the 'time' parameter.
-    return get_not_synced() and get_if_need_to_sync(time)
+def get_if_need_to_sync():
+    """
+    Checks if speed metrics need to be synced.
+    Returns True if:
+    1. No records have ever been successfully synced (get_never_synced()).
+    OR
+    2. The last 'synced' record in speed_metrics was more than a week ago from NOW.
+    """
+    if get_never_synced():
+        return True
+
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT MAX(timestamp) FROM speed_metrics WHERE synced = 1")
+    last_synced_timestamp_str = cursor.fetchone()[0]
+    conn.close()
+
+    if last_synced_timestamp_str:
+        last_synced_datetime = datetime.fromisoformat(last_synced_timestamp_str)
+        one_week_ago = datetime.now(UTC) - timedelta(weeks=1)
+        return last_synced_datetime < one_week_ago
+    else:
+        return True

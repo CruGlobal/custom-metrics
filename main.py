@@ -6,6 +6,7 @@ import requests
 from datetime import datetime, timedelta, UTC
 import remote_database
 import local_database
+import asyncio
 
 # Configure logging
 logging.basicConfig(
@@ -166,7 +167,7 @@ class NetworkMonitor:
             self._insert_speed_metrics(metrics_data)
     
     def check_sync(self):
-        if(local_database.get_if_need_to_sync((datetime.now(UTC) - timedelta(weeks=1)).isoformat())):
+        if(local_database.get_if_need_to_sync()):
            remote_database.init_db()
            ping_metrics_to_sync = local_database.get_ping_metrics_to_sync()
            speed_metrics_to_sync = local_database.get_speed_metrics_to_sync()
