@@ -79,26 +79,11 @@ class TestNetworkMonitor(unittest.TestCase):
         self.local_db_datetime_patcher.stop()
 
     def _setup_monitor(self):
-        # Helper to set up NetworkMonitor with mocked IP/location
-        original_side_effect = self.mock_getenv.side_effect
-        def side_effect(key, default=None):
-            if key == "LOCATION":
-                return None
-            return original_side_effect(key, default)
-        self.mock_getenv.side_effect = side_effect
-
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "ip": "123.45.67.89",
-            "city": "Test City",
-            "region": "Test Region",
-            "country": "TC"
-        }
-        mock_response.raise_for_status.return_value = None
-        # Clear side_effect and set the first call
-        self.mock_requests_get.side_effect = [mock_response]
-
+        # Helper to set up NetworkMonitor with mocked location
+        # Ensure mock_getenv for LOCATION consistently returns "test-location"
+        # No need for ipinfo.io mocking as IP collection is removed.
         self.monitor = NetworkMonitor() # Initialize monitor for this test
+        self.monitor.location = self.mock_getenv("LOCATION") # Set location as a string
 
     def test_smoke(self):
         """Basic smoke test to verify test infrastructure."""
@@ -107,7 +92,7 @@ class TestNetworkMonitor(unittest.TestCase):
         self.assertEqual(1 + 1, 2)
         self.assertIsNotNone(self.monitor)
         self.assertIsInstance(self.monitor, NetworkMonitor)
-        self.assertEqual(self.monitor.location[1], "Test City, Test Region, TC")
+        self.assertEqual(self.monitor.location, "test-location")
     def test_get_or_create_site_id_existing(self):
         """Test getting existing site ID."""
         test_site_id = "test-uuid-123"
@@ -142,10 +127,10 @@ class TestNetworkMonitor(unittest.TestCase):
         self.mock_requests_get.side_effect = [mock_prometheus_response] # Set side_effect as a list
 
         # Do not call _setup_monitor here, as it interferes with requests.get mock
-        # Instead, manually create a monitor for this test (site_id and IP/location won't matter)
-        with patch("main.NetworkMonitor._get_or_create_site_id", return_value="test-site-id"),\
-             patch("main.NetworkMonitor._get_ip_and_location", return_value=("127.0.0.1", "Test Location")):
+        # Instead, manually create a monitor for this test (site_id and location won't matter)
+        with patch("main.NetworkMonitor._get_or_create_site_id", return_value="test-site-id"):
             monitor = NetworkMonitor()
+            monitor.location = "Test Location" # Manually set location as a string
             result = monitor._query_prometheus("test_query")
             self.assertEqual(result, mock_prometheus_response.json.return_value)
 
@@ -153,9 +138,9 @@ class TestNetworkMonitor(unittest.TestCase):
         """Test failed Prometheus query."""
         self.mock_requests_get.side_effect = Exception("Connection error")
         # Manually create a monitor to avoid _setup_monitor interfering
-        with patch("main.NetworkMonitor._get_or_create_site_id", return_value="test-site-id"),\
-             patch("main.NetworkMonitor._get_ip_and_location", return_value=("127.0.0.1", "Test Location")):
+        with patch("main.NetworkMonitor._get_or_create_site_id", return_value="test-site-id"):
             monitor = NetworkMonitor()
+            monitor.location = "Test Location" # Manually set location as a string
             result = monitor._query_prometheus("test_query")
             self.assertIsNone(result)
 
@@ -225,7 +210,6 @@ class TestNetworkMonitor(unittest.TestCase):
         mock_insert_ping_metrics.assert_called_once()
         self.assertIn('site_id', mock_insert_ping_metrics.call_args[0][0])
         self.assertIn('location', mock_insert_ping_metrics.call_args[0][0])
-        self.assertIn('ip_address', mock_insert_ping_metrics.call_args[0][0])
         # Check if at least one ping metric was collected
         self.assertTrue(any(key in PING_METRICS for key in mock_insert_ping_metrics.call_args[0][0]))
 
@@ -244,9 +228,9 @@ class TestNetworkMonitor(unittest.TestCase):
 
         # Mock successful speedtest data for *all* SPEED_METRICS
         speedtest_mock_results = []
-        # First mock response is for the initial check for speedtest_up
-        mock_initial_speedtest_up = MagicMock()
-        mock_initial_speedtest_up.json.return_value = {
+        # Mock response for the initial check for speedtest_up (download_mbps query)
+        mock_initial_download_check = MagicMock()
+        mock_initial_download_check.json.return_value = {
             'data': {
                 'result': [{
                     'metric': {'instance': 'speedtest:9798'},
@@ -254,8 +238,8 @@ class TestNetworkMonitor(unittest.TestCase):
                 }]
             }
         }
-        mock_initial_speedtest_up.raise_for_status.return_value = None
-        speedtest_mock_results.append(mock_initial_speedtest_up)
+        mock_initial_download_check.raise_for_status.return_value = None
+        speedtest_mock_results.append(mock_initial_download_check)
 
         for i in range(len(SPEED_METRICS)):
             mock_response_item = MagicMock()
@@ -271,8 +255,8 @@ class TestNetworkMonitor(unittest.TestCase):
             mock_response_item.raise_for_status.return_value = None
             speedtest_mock_results.append(mock_response_item)
 
-        # Combine the ipinfo mock with speedtest mocks
-        self.mock_requests_get.side_effect = [ipinfo_mock_response] + speedtest_mock_results
+        # Set side_effect for requests.get
+        self.mock_requests_get.side_effect = speedtest_mock_results
 
         self.monitor = NetworkMonitor() # Initialize monitor for this test
         self.monitor.collect_speed_metrics()
@@ -308,12 +292,12 @@ class TestNetworkMonitor(unittest.TestCase):
         mock_insert_ping_metrics.assert_called_once()
 
         # Assert: local_database.get_if_need_to_sync was checked
-        mock_get_if_need_to_sync.assert_called_once_with((self.fixed_now - timedelta(weeks=1)).isoformat()) # Check for correct argument
+        mock_get_if_need_to_sync.assert_called_once() # Check for correct argument
 
     @patch("local_database.insert_ping_metrics")
     @patch("main.NetworkMonitor._query_prometheus")
     @patch("local_database.get_if_need_to_sync", return_value=False) # Corrected to local_database
-    @patch("remote_database.insert_ping_metrics")
+    @patch("remote_database.upload_ping_metrics")
     def test_add_second_record_to_local_sqlite_no_sync(self, mock_remote_insert_ping_metrics, mock_get_if_need_to_sync, mock_query_prometheus, mock_local_insert_ping_metrics):
         """
         Test case: Add another second record to local SQLite.
@@ -334,22 +318,22 @@ class TestNetworkMonitor(unittest.TestCase):
         # Assert: local_database.insert_ping_metrics was called twice
         self.assertEqual(mock_local_insert_ping_metrics.call_count, 2)
 
-        # Assert: remote_database.insert_ping_metrics was NOT called
+        # Assert: remote_database.upload_ping_metrics was NOT called
         mock_remote_insert_ping_metrics.assert_not_called()
         
         # Assert: local_database.get_if_need_to_sync was checked twice with correct argument
         # The call count should be 2, because check_sync is called twice implicitely (once for each collect_ping_metrics call, if it was not explicitly called, if it is explicitely called, it will be called once)
         # It will be called once to evaluate the condition inside check_sync
         self.assertEqual(mock_get_if_need_to_sync.call_count, 1) # Changed from 2 to 1 for explicit call
-        mock_get_if_need_to_sync.assert_called_with((self.fixed_now - timedelta(weeks=1)).isoformat()) # Check for correct argument
+        mock_get_if_need_to_sync.assert_called() # Check for correct argument
 
 
     @patch("local_database.get_ping_metrics_to_sync")
     @patch("local_database.get_speed_metrics_to_sync") # Added mock for speed metrics to sync
     @patch("local_database.mark_ping_metrics_as_synced")
     @patch("local_database.mark_speed_metrics_as_synced") # Added mock for speed metrics synced
-    @patch("remote_database.insert_ping_metrics")
-    @patch("remote_database.insert_speed_metrics")
+    @patch("remote_database.upload_ping_metrics")
+    @patch("remote_database.upload_speed_metrics")
     @patch("local_database.get_if_need_to_sync") # Corrected to local_database
     @patch("main.NetworkMonitor._query_prometheus")
     def test_sync_only_unsynced_records_after_week(self, mock_query_prometheus, mock_get_if_need_to_sync, mock_remote_insert_speed_metrics, mock_remote_insert_ping_metrics, mock_mark_speed_metrics_as_synced, mock_mark_ping_metrics_as_synced, mock_get_speed_metrics_to_sync, mock_get_ping_metrics_to_sync):
@@ -363,11 +347,11 @@ class TestNetworkMonitor(unittest.TestCase):
 
         # Mock local_database.get_ping_metrics_to_sync to return some unsynced records
         # I see the problem here. The test is set up to return 3 records (2 unsynced, 1 synced). 
-        # But the assertion expects 2 records to be sent to remote_database.insert_ping_metrics.
+        # But the assertion expects 2 records to be sent to remote_database.upload_ping_metrics.
         # This is because the test data has 2 unsynced records, which is correct for sending.
         # The issue is the test expects 2 records, but the provided `return_value` has 3 records. 
         # One of them is already synced and should not be returned by get_ping_metrics_to_sync.
-        # Let's adjust the mock_get_ping_metrics_to_sync.return_value to only return unsynced records as expected by the remote_database.insert_ping_metrics call.
+        # Let's adjust the mock_get_ping_metrics_to_sync.return_value to only return unsynced records as expected by the remote_database.upload_ping_metrics call.
         mock_get_ping_metrics_to_sync.return_value = [
             {'id': 1, 'timestamp': (self.fixed_now - timedelta(days=2)).isoformat(), 'synced': 0, **{metric: '1.0' for metric in PING_METRICS}},
             {'id': 2, 'timestamp': (self.fixed_now - timedelta(days=8)).isoformat(), 'synced': 0, **{metric: '1.0' for metric in PING_METRICS}}
@@ -382,16 +366,6 @@ class TestNetworkMonitor(unittest.TestCase):
         mock_get_if_need_to_sync.return_value = True
 
         # Mock Prometheus query (not directly relevant for sync logic, but needed for NetworkMonitor init)
-        # It needs to return a list of responses, the first for ipinfo.io, then for each PING_METRICS query.
-        ipinfo_mock_response = MagicMock()
-        ipinfo_mock_response.json.return_value = {
-            "ip": "123.45.67.89",
-            "city": "Test City",
-            "region": "Test Region",
-            "country": "TC"
-        }
-        ipinfo_mock_response.raise_for_status.return_value = None
-
         prometheus_mock_responses = []
         for i in range(len(PING_METRICS)):
             mock_response_item = MagicMock()
@@ -406,12 +380,12 @@ class TestNetworkMonitor(unittest.TestCase):
             mock_response_item.raise_for_status.return_value = None
             prometheus_mock_responses.append(mock_response_item)
 
-        self.mock_requests_get.side_effect = [ipinfo_mock_response] + prometheus_mock_responses
+        self.mock_requests_get.side_effect = prometheus_mock_responses
 
         # Act: Trigger sync check
         self.monitor.check_sync()
 
-        # Assert: remote_database.insert_ping_metrics was called once
+        # Assert: remote_database.upload_ping_metrics was called once
         mock_remote_insert_ping_metrics.assert_called_once()
         self.assertEqual(len(mock_remote_insert_ping_metrics.call_args[0][0]), 2)
         # Verify the actual content passed for ping metrics
@@ -435,7 +409,7 @@ class TestNetworkMonitor(unittest.TestCase):
         # Assert: local_database.mark_ping_metrics_as_synced was called with the IDs of the sent ping records
         mock_mark_ping_metrics_as_synced.assert_called_once_with([1, 2])
 
-        # Assert: remote_database.insert_speed_metrics was called once
+        # Assert: remote_database.upload_speed_metrics was called once
         mock_remote_insert_speed_metrics.assert_called_once()
         self.assertEqual(len(mock_remote_insert_speed_metrics.call_args[0][0]), 2)
         # Verify the actual content passed for speed metrics

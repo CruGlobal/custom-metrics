@@ -2,8 +2,8 @@ import os
 import uuid
 import logging
 import schedule
+import datetime
 import requests
-from datetime import datetime, timedelta, UTC
 import remote_database
 import local_database
 import asyncio
@@ -15,10 +15,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ! This may be mapped in the internet pi stack "/etc/network-monitor/site_id"
+# ! This can be mapped in the internet pi stack "/etc/network-monitor/site_id"
+LOCATION = os.getenv("LOCATION", "Isenguard")
 SITE_ID_FILE = "network-monitor/site_id"
-PING_TABLE = os.getenv("PING_TABLE", "ping")
-SPEED_TABLE = os.getenv("SPEED_TABLE", "speed")
+PING_TABLE = os.getenv("PING_TABLE", "Ping")
+SPEED_TABLE = os.getenv("SPEED_TABLE", "Speed")
 
 # Ping metrics to collect every 5 minutes
 PING_METRICS = {
@@ -46,29 +47,8 @@ SPEED_METRICS = {
 class NetworkMonitor:
     def __init__(self):
         self.site_id = self._get_or_create_site_id()
-        self.location = self._get_ip_and_location()
+        self.location = LOCATION
         
-    def _get_ip_and_location(self):
-        """Get public IP address and location."""
-        location = os.getenv("LOCATION")
-        try:
-            response = requests.get("https://ipinfo.io/json")
-            response.raise_for_status()
-            data = response.json()
-            ip = data.get("ip")
-            if location:
-                return ip, location
-            
-            city = data.get("city", "unknown")
-            region = data.get("region", "unknown")
-            country = data.get("country", "unknown")
-            return ip, f"{city}, {region}, {country}"
-        except Exception as e:
-            logger.error(f"Failed to get IP and location: {e}")
-            if location:
-                return "unknown", location
-            return "unknown", "unknown"
-
     def _get_or_create_site_id(self):
         """Get existing site ID or create a new one."""
         if os.path.exists(SITE_ID_FILE):
@@ -92,7 +72,7 @@ class NetworkMonitor:
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            logger.error(f"Failed to query Prometheus: {e} at {prometheus_url}")
+            logger.info(f"Failed to query Prometheus: {e} at {prometheus_url}")
             return None
 
     def _insert_ping_metrics(self, metrics_data):
@@ -100,27 +80,26 @@ class NetworkMonitor:
         try:
             # Add site_id and location to metrics_data
             metrics_data["site_id"] = self.site_id
-            metrics_data["location"] = self.location[1] # Pass only the location string
-            metrics_data["ip_address"] = self.location[0] # Pass the IP address separately
+            metrics_data["location"] = self.location # Pass only the location string
             
             # Insert into the database
             local_database.insert_ping_metrics(metrics_data)
             logger.info("Successfully inserted ping metrics into the local_database")
         except Exception as e:
-            logger.error(f"Error inserting ping metrics into the local_database: {e}")
+            logger.info(f"Error inserting ping metrics into the local_database: {e}")
 
     def _insert_speed_metrics(self, metrics_data):
         """Insert speedtest metrics directly into the database."""
         try:
             # Add site_id and location to metrics_data
             metrics_data["site_id"] = self.site_id
-            metrics_data["location"] = self.location[1] # Pass only the location string
+            metrics_data["location"] = self.location # Pass only the location string
             
             # Insert into the database
             local_database.insert_speed_metrics(metrics_data)
             logger.info("Successfully inserted speed metrics into the local_database")
         except Exception as e:
-            logger.error(f"Error inserting speed metrics into the local_database: {e}")
+            logger.info(f"Error inserting speed metrics into the local_database: {e}")
 
     def collect_ping_metrics(self):
         """Collect and store ping metrics."""
@@ -167,23 +146,12 @@ class NetworkMonitor:
             self._insert_speed_metrics(metrics_data)
     
     def check_sync(self):
-        if(local_database.get_if_need_to_sync()):
-           remote_database.init_db()
-           ping_metrics_to_sync = local_database.get_ping_metrics_to_sync()
-           speed_metrics_to_sync = local_database.get_speed_metrics_to_sync()
-
-           if ping_metrics_to_sync:
-               remote_database.insert_ping_metrics(ping_metrics_to_sync)
-               local_database.mark_ping_metrics_as_synced([m["id"] for m in ping_metrics_to_sync])
-
-           if speed_metrics_to_sync:
-               remote_database.insert_speed_metrics(speed_metrics_to_sync)
-               local_database.mark_speed_metrics_as_synced([m["id"] for m in speed_metrics_to_sync])
-           
-           if ping_metrics_to_sync or speed_metrics_to_sync:
-               logger.info("Successfully synced metrics to remote database.")
-           else:
-               logger.info("No metrics to sync to remote database.")
+        need_to_sync = local_database.get_if_need_to_sync()
+        if(need_to_sync):
+            remote_database.init_db()
+            remote_database.upload_ping_metrics()
+            remote_database.upload_speed_metrics()
+            logger.info("Successfully synced all metrics to remote database.")
 
 
 async def main():
@@ -201,9 +169,9 @@ async def main():
     # Run initial collection
     monitor.collect_ping_metrics()
     monitor.collect_speed_metrics()
-
-    # TODO check if we need to sync to remote
     monitor.check_sync()
+
+    schedule.every().day.do(monitor.check_sync)
     
     # Keep the script running
     while True:

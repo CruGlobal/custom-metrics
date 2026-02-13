@@ -4,7 +4,7 @@ import os
 import time # Added for retry mechanism
 import logging # Added for logging
 import sqlite3
-from datetime import datetime, timedelta, UTC # Added timedelta and UTC for date calculations
+from datetime import datetime, timedelta, UTC 
 
 # Database file path
 DB_FILE = "metrics.db"
@@ -180,16 +180,14 @@ def get_ping_metrics_to_sync():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row # Enable dictionary-like access to rows
     cursor = conn.cursor()
-
-    one_week_ago = (datetime.now(UTC) - timedelta(weeks=1)).isoformat()
     
     cursor.execute("""
         SELECT id, timestamp, site_id, location, google_up, apple_up, github_up, 
                pihole_up, node_up, speedtest_up, http_latency, http_samples, 
                http_time, http_content_length, http_duration, synced
         FROM ping_metrics
-        WHERE synced = 0 OR timestamp < ?
-    """, (one_week_ago,))
+        WHERE synced = 0 
+    """)
     
     rows = cursor.fetchall()
     
@@ -206,15 +204,13 @@ def get_speed_metrics_to_sync():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row # Enable dictionary-like access to rows
     cursor = conn.cursor()
-
-    one_week_ago = (datetime.now(UTC) - timedelta(weeks=1)).isoformat()
     
     cursor.execute("""
         SELECT id, timestamp, site_id, location, download_mbps, 
             upload_mbps, ping_ms, jitter_ms, synced
         FROM speed_metrics
-        WHERE synced = 0 OR timestamp < ?
-    """, (one_week_ago,))
+        WHERE synced = 0
+    """ )
     
     rows = cursor.fetchall()
     
@@ -225,66 +221,24 @@ def get_speed_metrics_to_sync():
     # Remote DOES NOT have `synced` column. Do not send
     return result
 
-def get_all_ping_metrics():
-    """Retrieve all ping metrics from the database."""
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row # Enable dictionary-like access to rows
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT * FROM ping_metrics")
-    rows = cursor.fetchall()
-    
-    # Convert rows to list of dictionaries (already handled by row_factory)
-    result = [dict(row) for row in rows]
-    
-    conn.close()
-    return result
-
-def get_all_speed_metrics():
-    """Retrieve all speed metrics from the database."""
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row # Enable dictionary-like access to rows
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT * FROM speed_metrics")
-    rows = cursor.fetchall()
-    
-    # Convert rows to list of dictionaries (already handled by row_factory)
-    result = [dict(row) for row in rows]
-    
-    conn.close()
-    return result
-
-def clear_ping_metrics():
-    """Clear all ping metrics from the database."""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    
-    cursor.execute("DELETE FROM ping_metrics")
-    
-    conn.commit()
-    conn.close()
-
-def clear_speed_metrics():
-    """Clear all speed metrics from the database."""
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    
-    cursor.execute("DELETE FROM speed_metrics")
-    
-    conn.commit()
-    conn.close()
-
 def get_never_synced():
     """
-    No records have ever been successfully synced.
+    Return True if:
+    1. Records exist in speed_metrics table.
+    AND
+    2. No records have ever been successfully synced ( = 1).
     """
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM speed_metrics")
+    total_records = cursor.fetchone()[0]
     cursor.execute("SELECT COUNT(*) FROM speed_metrics WHERE synced = 1")
-    count = cursor.fetchone()[0]
+    synced_records = cursor.fetchone()[0]
+
     conn.close()
-    return count == 0
+
+    # logging.info(f"get_never_synced() total_records {total_records}  synced_records {synced_records} ")
+    return total_records > 0 and synced_records == 0
 
 def get_if_need_to_sync():
     """
@@ -295,6 +249,7 @@ def get_if_need_to_sync():
     2. The last 'synced' record in speed_metrics was more than a week ago from NOW.
     """
     if get_never_synced():
+        # logging.info(f"get_if_need_to_sync(): get_never_synced() TRUE")
         return True
 
     conn = sqlite3.connect(DB_FILE)
@@ -306,6 +261,8 @@ def get_if_need_to_sync():
     if last_synced_timestamp_str:
         last_synced_datetime = datetime.fromisoformat(last_synced_timestamp_str)
         one_week_ago = datetime.now(UTC) - timedelta(weeks=1)
+        # logging.info(f"get_if_need_to_sync(): last_synced_timestamp_str {last_synced_datetime} one_week_ago {one_week_ago}")
         return last_synced_datetime < one_week_ago
     else:
-        return True
+        # logging.info(f"get_if_need_to_sync(): default False")
+        return False
