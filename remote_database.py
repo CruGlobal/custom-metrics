@@ -112,7 +112,6 @@ def upload_ping_metrics():
         return
 
     bqc = get_bigquery_client()
-    # table_ref = bqc.dataset(DATASET_ID).table(PING_TABLE_ID)
     table_ref = f"{PROJECT_ID}.{DATASET_ID}.{PING_TABLE_ID}"
 
     rows_to_insert = []
@@ -150,7 +149,6 @@ def upload_speed_metrics(metrics_data):
     """Insert speed metrics into BigQuery."""
     metrics_data = local_database.get_ping_metrics_to_sync()
     bqc = get_bigquery_client()
-    # table_ref = bqc.dataset(DATASET_ID).table(SPEED_TABLE_ID)
     table_ref = f"{PROJECT_ID}.{DATASET_ID}.{SPEED_TABLE_ID}"
 
     rows_to_insert = []

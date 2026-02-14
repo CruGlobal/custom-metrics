@@ -73,7 +73,7 @@ def insert_ping_metrics(metrics_data):
     
     # Prepare the data for insertion
     data = {
-        "timestamp": datetime.now(UTC).isoformat(),
+        "timestamp": str(metrics_data.get("timestamp")) if metrics_data.get("timestamp") is not None else datetime.now(UTC).isoformat(),
         "site_id": str(metrics_data.get("site_id")) if metrics_data.get("site_id") is not None else None,
         "location": str(metrics_data.get("location")) if metrics_data.get("location") is not None else None,
         "google_up": metrics_data.get("google_up"),
@@ -113,7 +113,7 @@ def insert_speed_metrics(metrics_data):
     
     # Prepare the data for insertion
     data = {
-        "timestamp": datetime.now(UTC).isoformat(),
+        "timestamp": str(metrics_data.get("timestamp")) if metrics_data.get("timestamp") is not None else datetime.now(UTC).isoformat(),
         "site_id": str(metrics_data.get("site_id")) if metrics_data.get("site_id") is not None else None,
         "location": str(metrics_data.get("location")) if metrics_data.get("location") is not None else None,
         "download_mbps": metrics_data.get("download_mbps"),

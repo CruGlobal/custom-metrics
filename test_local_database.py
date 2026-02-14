@@ -109,5 +109,101 @@ class TestLocalDatabase(unittest.TestCase):
         self.assertEqual(row[3], "test-location") # location
         self.assertEqual(row[14], 0.2) # http_duration
 
+    def test_insert_ping_metrics_with_provided_timestamp(self):
+        """
+        Test that a provided timestamp is correctly inserted for ping metrics.
+        """
+        provided_timestamp = datetime(2025, 1, 1, 10, 30, 0, tzinfo=UTC).isoformat()
+        metrics_data = {
+            "timestamp": provided_timestamp,
+            "site_id": "test-site-ts",
+            "location": "test-location-ts",
+            "google_up": 1, "apple_up": 1, "github_up": 1, "pihole_up": 1,
+            "node_up": 1, "speedtest_up": 1, "http_latency": 0.1,
+            "http_samples": 10, "http_time": 0.5, "http_content_length": 100,
+            "http_duration": 0.2
+        }
+        local_database.insert_ping_metrics(metrics_data)
+
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
+        cursor.execute("SELECT timestamp FROM ping_metrics WHERE site_id = 'test-site-ts'")
+        row = cursor.fetchone()
+        conn.close()
+
+        self.assertIsNotNone(row)
+        self.assertEqual(row[0], provided_timestamp)
+
+    def test_insert_ping_metrics_without_timestamp(self):
+        """
+        Test that the default timestamp is used when none is provided for ping metrics.
+        """
+        metrics_data = {
+            "site_id": "test-site-no-ts",
+            "location": "test-location-no-ts",
+            "google_up": 1, "apple_up": 1, "github_up": 1, "pihole_up": 1,
+            "node_up": 1, "speedtest_up": 1, "http_latency": 0.1,
+            "http_samples": 10, "http_time": 0.5, "http_content_length": 100,
+            "http_duration": 0.2
+        }
+        local_database.insert_ping_metrics(metrics_data)
+
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
+        cursor.execute("SELECT timestamp FROM ping_metrics WHERE site_id = 'test-site-no-ts'")
+        row = cursor.fetchone()
+        conn.close()
+
+        self.assertIsNotNone(row)
+        self.assertEqual(row[0], self.fixed_now.isoformat())
+
+    def test_insert_speed_metrics_with_provided_timestamp(self):
+        """
+        Test that a provided timestamp is correctly inserted for speed metrics.
+        """
+        provided_timestamp = datetime(2025, 1, 2, 11, 0, 0, tzinfo=UTC).isoformat()
+        metrics_data = {
+            "timestamp": provided_timestamp,
+            "site_id": "test-site-speed-ts",
+            "location": "test-location-speed-ts",
+            "download_mbps": 100.0,
+            "upload_mbps": 50.0,
+            "ping_ms": 10.0,
+            "jitter_ms": 2.0
+        }
+        local_database.insert_speed_metrics(metrics_data)
+
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
+        cursor.execute("SELECT timestamp FROM speed_metrics WHERE site_id = 'test-site-speed-ts'")
+        row = cursor.fetchone()
+        conn.close()
+
+        self.assertIsNotNone(row)
+        self.assertEqual(row[0], provided_timestamp)
+
+    def test_insert_speed_metrics_without_timestamp(self):
+        """
+        Test that the default timestamp is used when none is provided for speed metrics.
+        """
+        metrics_data = {
+            "site_id": "test-site-speed-no-ts",
+            "location": "test-location-speed-no-ts",
+            "download_mbps": 100.0,
+            "upload_mbps": 50.0,
+            "ping_ms": 10.0,
+            "jitter_ms": 2.0
+        }
+        local_database.insert_speed_metrics(metrics_data)
+
+        conn = sqlite3.connect(self.db_file)
+        cursor = conn.cursor()
+        cursor.execute("SELECT timestamp FROM speed_metrics WHERE site_id = 'test-site-speed-no-ts'")
+        row = cursor.fetchone()
+        conn.close()
+
+        self.assertIsNotNone(row)
+        self.assertEqual(row[0], self.fixed_now.isoformat())
+
 if __name__ == '__main__':
     unittest.main()
