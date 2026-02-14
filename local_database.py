@@ -126,10 +126,10 @@ def insert_speed_metrics(metrics_data):
     cursor.execute("""
         INSERT INTO speed_metrics (
             timestamp, site_id, location, download_mbps, 
-            upload_mbps, ping_ms, jitter_ms, synced
+            upload_mbps, ping_ms, jitter_ms
         ) VALUES (
             ?, ?, ?, ?, ?,
-            ?, ?, ?, 0
+            ?, ?
         )
     """, (data["timestamp"], data["site_id"], data["location"],  data["download_mbps"],
           data["upload_mbps"], data["ping_ms"], data["jitter_ms"]))

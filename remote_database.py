@@ -145,7 +145,7 @@ def upload_ping_metrics():
             local_database.mark_ping_metrics_as_synced(metric_ids_to_mark_synced)
             logger.info(f"Successfully inserted {len(rows_to_insert)} ping metrics into BigQuery and marked as synced.")
 
-def upload_speed_metrics(metrics_data):
+def upload_speed_metrics():
     """Insert speed metrics into BigQuery."""
     metrics_data = local_database.get_ping_metrics_to_sync()
     bqc = get_bigquery_client()
