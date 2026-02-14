@@ -31,10 +31,11 @@ def get_bigquery_client():
     if client is None:
         try:
             client = bigquery.Client()
-            return client
         except Exception as e:
-            logger.info(f"Failed to initialize BigQuery client: {e}")
-            raise
+            logger.error(f"Failed to initialize BigQuery client: {e}")
+            client = None 
+            raise 
+    return client
 
 # Define BigQuery schemas
 PING_TABLE_SCHEMA = [
@@ -66,33 +67,9 @@ SPEED_TABLE_SCHEMA = [
 
 def init_db():
     """Connect to the BigQuery dataset and tables with retry mechanism."""
-    bqc = get_bigquery_client()
-    dataset_ref = bqc.dataset(DATASET_ID)
-
     for i in range(1, MAX_DB_RETRIES + 1):
         try:
-            # logger.info(f"Attempting to connect to BigQuery (Attempt {i}/{MAX_DB_RETRIES})...")
-
-            try:
-                bqc.get_dataset(dataset_ref)
-                # logger.info(f"BigQuery Dataset '{DATASET_ID}' already exists.")
-            except NotFound:
-                logger.info(f"BigQuery Dataset '{DATASET_ID}' not found.")
-
-            ping_table_ref = dataset_ref.table(PING_TABLE_ID)
-            try:
-                bqc.get_table(ping_table_ref)
-                # logger.info(f"BigQuery Table '{PING_TABLE_ID}' exists.")
-            except NotFound:
-                logger.info(f"BigQuery Table '{PING_TABLE_ID}' not found.")
-
-            speed_table_ref = dataset_ref.table(SPEED_TABLE_ID)
-            try:
-                bqc.get_table(speed_table_ref)
-                # logger.info(f"BigQuery Table '{SPEED_TABLE_ID}' exists.")
-            except NotFound:
-                logger.info(f"BigQuery Table '{SPEED_TABLE_ID}' not found.")
-
+            bqc = get_bigquery_client() 
             break
         except Exception as e:
             logger.info(f"BigQuery initialization failed: {e}")
@@ -110,8 +87,6 @@ def upload_ping_metrics():
     if not metrics_to_sync:
         logger.info("No ping metrics to sync.")
         return
-
-    bqc = get_bigquery_client()
     table_ref = f"{PROJECT_ID}.{DATASET_ID}.{PING_TABLE_ID}"
 
     rows_to_insert = []
@@ -119,7 +94,7 @@ def upload_ping_metrics():
 
     for metric in metrics_to_sync:
         row = {
-            "timestamp": datetime.fromisoformat(metric["timestamp"]) if metric.get("timestamp") else None,
+            "timestamp": datetime.fromisoformat(metric["timestamp"]).isoformat() if metric.get("timestamp") else None,
             "site_id": metric.get("site_id"),
             "location": metric.get("location"),
             "google_up": metric.get("google_up"),
@@ -138,24 +113,19 @@ def upload_ping_metrics():
         metric_ids_to_mark_synced.append(metric['id'])
 
     if rows_to_insert:
-        errors = bqc.insert_rows_json(table_ref, rows_to_insert)
-        if errors:
-            logger.info(f"Errors encountered while inserting ping metrics: {errors}")
-        else:
-            local_database.mark_ping_metrics_as_synced(metric_ids_to_mark_synced)
-            logger.info(f"Successfully inserted {len(rows_to_insert)} ping metrics into BigQuery and marked as synced.")
+        _upload(table_ref, rows_to_insert)
+        local_database.mark_ping_metrics_as_synced(metric_ids_to_mark_synced)
 
 def upload_speed_metrics():
     """Insert speed metrics into BigQuery."""
     metrics_data = local_database.get_ping_metrics_to_sync()
-    bqc = get_bigquery_client()
     table_ref = f"{PROJECT_ID}.{DATASET_ID}.{SPEED_TABLE_ID}"
 
     rows_to_insert = []
     metric_ids_to_mark_synced = []
     for metric in metrics_data:
         row = {
-            'timestamp': datetime.fromisoformat(metric["timestamp"]) if metric.get("timestamp") else None,
+            'timestamp': datetime.fromisoformat(metric["timestamp"]).isoformat() if metric.get("timestamp") else None,
             'site_id': metric.get('site_id'),
             'location': metric.get('location'),
             'download_mbps': metric.get('download_mbps'),
@@ -167,9 +137,16 @@ def upload_speed_metrics():
         metric_ids_to_mark_synced.append(metric['id'])
 
     if rows_to_insert:
-        errors = bqc.insert_rows_json(table_ref, rows_to_insert)
-        if errors:
-            logger.info(f"Errors encountered while inserting speed metrics: {errors}")
-        else:
-            logger.info(f"Successfully inserted {len(rows_to_insert)} speed metrics into BigQuery.")
-            local_database.mark_speed_metrics_as_synced(rows_to_insert)
+        _upload(table_ref, rows_to_insert)
+        local_database.mark_speed_metrics_as_synced(metric_ids_to_mark_synced)
+
+def _upload(table_ref, rows_to_insert):
+    bqc = get_bigquery_client()
+    if bqc is None:
+        logger.info("BigQuery client not initialized. Cannot upload ping metrics.")
+        return
+    errors = bqc.insert_rows_json(table_ref, rows_to_insert)
+    if errors:
+        logger.info(f"Errors encountered while inserting metrics to {table_ref} : {errors}")
+    else:
+        logger.info(f"Successfully inserted {len(rows_to_insert)} metrics into BigQuery {table_ref}.")
