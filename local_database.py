@@ -249,7 +249,7 @@ def get_if_need_to_sync():
     2. The last 'synced' record in speed_metrics was more than a week ago from NOW.
     """
     if get_never_synced():
-        # logging.info(f"get_if_need_to_sync(): get_never_synced() TRUE")
+        logging.info(f"get_if_need_to_sync(): get_never_synced() TRUE")
         return True
 
     conn = sqlite3.connect(DB_FILE)
@@ -261,7 +261,7 @@ def get_if_need_to_sync():
     if last_synced_timestamp_str:
         last_synced_datetime = datetime.fromisoformat(last_synced_timestamp_str)
         one_week_ago = datetime.now(UTC) - timedelta(weeks=1)
-        # logging.info(f"get_if_need_to_sync(): last_synced_timestamp_str {last_synced_datetime} one_week_ago {one_week_ago}")
+        logging.info(f"get_if_need_to_sync(): last_synced_timestamp_str {last_synced_datetime} one_week_ago {one_week_ago} TRUE")
         return last_synced_datetime < one_week_ago
     else:
         # logging.info(f"get_if_need_to_sync(): default False")

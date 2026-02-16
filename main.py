@@ -84,7 +84,7 @@ class NetworkMonitor:
             
             # Insert into the database
             local_database.insert_ping_metrics(metrics_data)
-            logger.info("Successfully inserted ping metrics into the local_database")
+            # logger.info("Successfully inserted ping metrics into the local_database")
         except Exception as e:
             logger.info(f"Error inserting ping metrics into the local_database: {e}")
 
@@ -103,7 +103,7 @@ class NetworkMonitor:
 
     def collect_ping_metrics(self):
         """Collect and store ping metrics."""
-        logger.info("Collecting ping metrics...")
+        # logger.info("Collecting ping metrics...")
         metrics_data = {}
         
         for metric_name, query in PING_METRICS.items():
@@ -166,6 +166,7 @@ async def main():
     # (it will only insert data if new speedtest results are available)
     schedule.every(60).minutes.do(monitor.collect_speed_metrics)
 
+    monitor.check_sync()
     schedule.every().day.do(monitor.check_sync)
     
     # Keep the script running
