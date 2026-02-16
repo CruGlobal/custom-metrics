@@ -122,7 +122,7 @@ class NetworkMonitor:
 
     def collect_speed_metrics(self):
         """Collect and store speedtest metrics if available."""
-        logger.info("Checking for speedtest metrics...")
+        # logger.info("Checking for speedtest metrics...")
         metrics_data = {}
         
         # First check if speedtest is up
@@ -151,8 +151,6 @@ class NetworkMonitor:
             remote_database.init_db()
             remote_database.upload_ping_metrics()
             remote_database.upload_speed_metrics()
-            # logger.info("Successfully synced metrics to remote database.")
-
 
 async def main():
     local_database.init_db()
@@ -164,7 +162,7 @@ async def main():
     
     # Schedule speedtest metrics collection every 60 minutes
     # (it will only insert data if new speedtest results are available)
-    schedule.every(60).minutes.do(monitor.collect_speed_metrics)
+    schedule.every(15).minutes.do(monitor.collect_speed_metrics)
 
     monitor.check_sync()
     schedule.every().day.do(monitor.check_sync)
