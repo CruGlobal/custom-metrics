@@ -23,8 +23,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY main.py .
-COPY local_database.py .
-COPY remote_database.py .
+COPY submit_to_google_form.py .
 
 # Run the application
 CMD ["python", "main.py"]
