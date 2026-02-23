@@ -129,6 +129,9 @@ class NetworkMonitor:
             logger.info(f"No speedtest data found")
             return
         
+        metrics_data["site_id"] = self.site_id
+        metrics_data["location"] = self.location # Pass only the location string
+        
         for metric_name, query in SPEED_METRICS.items():
             result = self._query_prometheus(query)
             if result and 'data' in result and 'result' in result['data']:
