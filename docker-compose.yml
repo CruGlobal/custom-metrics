@@ -3,15 +3,8 @@ services:
     build: .
     environment:
       - LOCATION=${LOCATION}
-      - UPDATE_INTERVAL=${UPDATE_INTERVAL}
-      - GOOGLE_APPLICATION_CREDENTIALS=/app/.secret.json
-      - PROJECT_ID=lmi-sheets
-      - DATASET_ID=custom_metrics_data
-      - PING_TABLE_ID=Ping
-      - SPEED_TABLE_ID=Speed
     volumes:
       - custom_metrics_data:/data
-      - ./.secret.json:/app/.secret.json
     restart: unless-stopped
 
 volumes:

@@ -14,8 +14,8 @@ PING_FORM_ENTRY_IDS = {
     "location": "entry.1210248263",
     "google_up": "entry.1234320055",
     "apple_up": "entry.1570063945",
-    # "pihole_up": "entry.1570063945",
-    # "node_up": "entry.1570063945",
+    "pihole_up": "entry.2027274655",
+    "node_up": "entry.233669881",
     "github_up": "entry.85529884",
     "speedtest_up": "entry.755750213",
     "http_latency": "entry.267708514",
@@ -26,6 +26,7 @@ PING_FORM_ENTRY_IDS = {
 }
 
 SPEED_FORM_ENTRY_IDS = {
+    "site_id": "entry.1089427232",
     "siteid": "entry.1089427232",
     "timestamp": "entry.17901975",
     "location": "entry.389737321",

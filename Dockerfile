@@ -1,5 +1,5 @@
 # custom-metrics/Dockerfile
-FROM python:3.13-slim-bookworm
+FROM --platform=linux/arm64/v8 python:3.13-slim-bookworm
 
 WORKDIR /app
 
