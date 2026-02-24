@@ -1,6 +1,6 @@
 # Network Monitoring Service
 
-A Python service that collects network metrics from Prometheus and stores them in BigQuery for analysis. The service monitors various network metrics including ping times to major services (Google, Apple, GitHub) and speedtest results.
+A Python service that collects network metrics from Prometheus and stores them in google sheets. The service monitors various network metrics including ping times to major services (Google, Apple, GitHub) and speedtest results.
 
 ## Setup
 
