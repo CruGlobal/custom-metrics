@@ -81,7 +81,7 @@ class NetworkMonitor:
             
             # Insert into the database
             ping(metrics_data)
-            logger.info(f"Successfully submitted {len(metrics_data)} ping metrics to Google Form")
+            # logger.info(f"Successfully submitted {len(metrics_data)} ping metrics to Google Form")
         except Exception as e:
             logger.info(f"Error submitting ping metrics to Google Form: {e}")
 
@@ -94,7 +94,7 @@ class NetworkMonitor:
             
             # Insert into the database
             speed(metrics_data)
-            logger.info(f"Successfully submitted {len(metrics_data)} speed metrics to Google Form")
+            # logger.info(f"Successfully submitted {len(metrics_data)} speed metrics to Google Form")
 
         except Exception as e:
             logger.info(f"Error submitting speed metrics to Google Form: {e}")
