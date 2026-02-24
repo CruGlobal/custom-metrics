@@ -1,5 +1,5 @@
 # custom-metrics/Dockerfile
-FROM python:3.11-slim
+FROM python:3.13
 
 WORKDIR /app
 
