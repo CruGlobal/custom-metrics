@@ -10,7 +10,9 @@ RUN apt-get update && \
    python3-dev \
    libpq-dev \
    libffi-dev \
-   cmake && \
+   cmake \
+   zlib1g \
+   libz-dev && \
    rm -rf /var/lib/apt/lists/*
 
 # Create config directory for credentials
