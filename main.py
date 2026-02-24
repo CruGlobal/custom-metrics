@@ -73,26 +73,24 @@ class NetworkMonitor:
             return None
 
     def _insert_ping_metrics(self, metrics_data):
-        """Insert ping metrics directly into the local_database."""
+        """Insert ping metrics directly into the sheet."""
         try:
             # Add site_id and location to metrics_data
             metrics_data["site_id"] = self.site_id
             metrics_data["location"] = self.location # Pass only the location string
             
-            # Insert into the database
             ping(metrics_data)
             # logger.info(f"Successfully submitted {len(metrics_data)} ping metrics to Google Form")
         except Exception as e:
             logger.info(f"Error submitting ping metrics to Google Form: {e}")
 
     def _insert_speed_metrics(self, metrics_data):
-        """Insert speedtest metrics directly into the database."""
+        """Insert speedtest metrics directly into the form."""
         try:
             # Add site_id and location to metrics_data
             metrics_data["site_id"] = self.site_id
             metrics_data["location"] = self.location # Pass only the location string
             
-            # Insert into the database
             speed(metrics_data)
             # logger.info(f"Successfully submitted {len(metrics_data)} speed metrics to Google Form")
 
@@ -142,10 +140,8 @@ class NetworkMonitor:
                         metrics_data[metric_name] = value / 1_000_000
                     else:
                         metrics_data[metric_name] = value
-        
         if metrics_data:
-
-            logger.info(f"No speedtest data {metrics_data}")
+            # logger.info(f"Found speedtest data {metrics_data}")
             self._insert_speed_metrics(metrics_data)
     
 

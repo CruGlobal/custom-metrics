@@ -1,5 +1,5 @@
 # custom-metrics/Dockerfile
-FROM python:3.13
+FROM python:3.13-slim-bookworm
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ RUN apt-get update && \
    libpq-dev \
    libffi-dev \
    cmake \
-   zlib1g \
+   zlib1g-dev \
    libz-dev && \
    rm -rf /var/lib/apt/lists/*
 
