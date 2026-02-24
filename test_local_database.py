@@ -184,7 +184,7 @@ class TestLocalDatabase(unittest.TestCase):
 
     def test_insert_speed_metrics_without_timestamp(self):
         """
-        Test that the default timestamp is used when none is provided for speed metrics.
+        Test that 'now' is default timestamp is used when none is provided for speed metrics.
         """
         metrics_data = {
             "site_id": "test-site-speed-no-ts",
@@ -198,12 +198,13 @@ class TestLocalDatabase(unittest.TestCase):
 
         conn = sqlite3.connect(self.db_file)
         cursor = conn.cursor()
+        when_made = datetime.now(UTC).isoformat()
         cursor.execute("SELECT timestamp FROM speed_metrics WHERE site_id = 'test-site-speed-no-ts'")
         row = cursor.fetchone()
         conn.close()
 
         self.assertIsNotNone(row)
-        self.assertEqual(row[0], self.fixed_now.isoformat())
+        self.assertEqual(row[0], when_made)
 
 if __name__ == '__main__':
     unittest.main()

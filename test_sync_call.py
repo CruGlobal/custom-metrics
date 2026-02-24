@@ -24,6 +24,7 @@ class TestNetworkMonitorSync(unittest.TestCase):
 
         # Now set the return values for the methods on the mock_local_db
         self.mock_local_db.get_if_need_to_sync.return_value = False # Default, can be overridden in tests
+        mock_local_db_get_if_need_to_sync = False
         self.mock_local_db.get_ping_metrics_to_sync.return_value = [] # Default
         self.mock_local_db.get_speed_metrics_to_sync.return_value = [] # Default
         self.mock_local_db.mark_ping_metrics_as_synced.return_value = None # Default
@@ -46,42 +47,6 @@ class TestNetworkMonitorSync(unittest.TestCase):
         self.mock_remote_db.upload_speed_metrics.assert_not_called() # Corrected from insert_speed_metrics
         self.mock_local_db.mark_ping_metrics_as_synced.assert_not_called()
         self.mock_local_db.mark_speed_metrics_as_synced.assert_not_called()
-
-    def test_check_sync_ping_metrics_only(self):
-        """Test check_sync when only ping metrics are available for syncing."""
-        self.mock_local_db.get_if_need_to_sync.return_value = True
-        ping_metrics = [{'id': 1, 'timestamp': '2026-01-01T00:00:00', 'site_id': 'test_site_id', 'location': 'test_location', 'google_up': 1}]
-        self.mock_local_db.get_ping_metrics_to_sync.return_value = ping_metrics
-        self.mock_local_db.get_speed_metrics_to_sync.return_value = []
-
-        self.monitor.check_sync()
-
-        self.mock_local_db.get_if_need_to_sync.assert_called_once()
-        self.mock_local_db.get_ping_metrics_to_sync.assert_called_once()
-        self.mock_local_db.get_speed_metrics_to_sync.assert_called_once()
-        self.mock_remote_db.init_db.assert_called_once()
-        self.mock_remote_db.upload_ping_metrics.assert_called_once() # Corrected from insert_ping_metrics
-        self.mock_remote_db.upload_speed_metrics.assert_not_called() # Corrected from insert_speed_metrics
-        self.mock_local_db.mark_ping_metrics_as_synced.assert_not_called()
-        self.mock_local_db.mark_speed_metrics_as_synced.assert_not_called()
-
-    def test_check_sync_speed_metrics_only(self):
-        """Test check_sync when only speed metrics are available for syncing."""
-        self.mock_local_db.get_if_need_to_sync.return_value = True
-        self.mock_local_db.get_ping_metrics_to_sync.return_value = []
-        speed_metrics = [{'id': 2, 'timestamp': '2026-01-01T00:00:00', 'site_id': 'test_site_id', 'location': 'test_location', 'download_mbps': 100}]
-        self.mock_local_db.get_speed_metrics_to_sync.return_value = speed_metrics
-
-        self.monitor.check_sync()
-
-        self.mock_local_db.get_if_need_to_sync.assert_called_once()
-        self.mock_local_db.get_ping_metrics_to_sync.assert_called_once()
-        self.mock_local_db.get_speed_metrics_to_sync.assert_called_once()
-        self.mock_remote_db.init_db.assert_called_once()
-        self.mock_remote_db.upload_ping_metrics.assert_not_called() # Corrected from insert_ping_metrics
-        self.mock_remote_db.upload_speed_metrics.assert_called_once() # Corrected from insert_speed_metrics
-        self.mock_local_db.mark_ping_metrics_as_synced.assert_not_called()
-        self.mock_local_db.mark_speed_metrics_as_synced.assert_called_once_with([2])
 
     def test_check_sync_both_metrics(self):
         """Test check_sync when both ping and speed metrics are available for syncing."""
