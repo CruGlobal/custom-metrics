@@ -147,6 +147,8 @@ class NetworkMonitor:
 
 
 async def main():
+    logger.info(f"Starting main.py in custom-metrics")
+
     monitor = NetworkMonitor()
     
     # Schedule ping metrics collection every 5 minutes

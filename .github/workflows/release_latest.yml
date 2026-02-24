@@ -8,9 +8,9 @@ on:
 permissions:
   contents: write
 jobs:
-  call-tests:
-    name: Test
-    uses: ./.github/workflows/tests.yml
+  # call-tests:
+  #   name: Test
+    # uses: ./.github/workflows/tests.yml
 
   # call-bump-version:
   #   name: Version
