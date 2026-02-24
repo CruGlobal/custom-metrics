@@ -6,13 +6,7 @@ WORKDIR /app
 # Install system dependencies required for building some Python packages
 RUN apt-get update && \
    apt-get install -y --no-install-recommends \
-   build-essential \
-   python3-dev \
-   libpq-dev \
-   libffi-dev \
-   cmake \
-   zlib1g-dev \
-   libz-dev && \
+   && \
    rm -rf /var/lib/apt/lists/*
 
 # Create config directory for credentials
