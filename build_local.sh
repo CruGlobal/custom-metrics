@@ -1,3 +1,3 @@
 #!bin/bash
 
-docker build -t custom-metrics:local .
+docker build -t digiserve/custom-metrics:master .
