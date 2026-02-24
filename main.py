@@ -4,9 +4,8 @@ import logging
 import schedule
 import datetime
 import requests
-import remote_database
-import local_database
 import asyncio
+from submit_to_google_form import ping, speed
 
 # Configure logging
 logging.basicConfig(
@@ -18,8 +17,6 @@ logger = logging.getLogger(__name__)
 # ! This can be mapped in the internet pi stack "/etc/network-monitor/site_id"
 LOCATION = os.getenv("LOCATION", "Isenguard")
 SITE_ID_FILE = "network-monitor/site_id"
-PING_TABLE = os.getenv("PING_TABLE", "Ping")
-SPEED_TABLE = os.getenv("SPEED_TABLE", "Speed")
 
 # Ping metrics to collect every 5 minutes
 PING_METRICS = {
@@ -46,7 +43,7 @@ SPEED_METRICS = {
 
 class NetworkMonitor:
     def __init__(self):
-        self.site_id = self._get_or_create_site_id()
+        self.site_id = "TEMP_TEST_DATA"
         self.location = LOCATION
         
     def _get_or_create_site_id(self):
@@ -83,10 +80,10 @@ class NetworkMonitor:
             metrics_data["location"] = self.location # Pass only the location string
             
             # Insert into the database
-            local_database.insert_ping_metrics(metrics_data)
-            # logger.info("Successfully inserted ping metrics into the local_database")
+            ping(metrics_data)
+            # logger.info(f"Successfully submitted {len(metrics_data)} ping metrics to Google Form")
         except Exception as e:
-            logger.info(f"Error inserting ping metrics into the local_database: {e}")
+            logger.info(f"Error submitting ping metrics to Google Form: {e}")
 
     def _insert_speed_metrics(self, metrics_data):
         """Insert speedtest metrics directly into the database."""
@@ -96,10 +93,11 @@ class NetworkMonitor:
             metrics_data["location"] = self.location # Pass only the location string
             
             # Insert into the database
-            local_database.insert_speed_metrics(metrics_data)
-            logger.info("Successfully inserted speed metrics into the local_database")
+            speed(metrics_data)
+            # logger.info(f"Successfully submitted {len(metrics_data)} speed metrics to Google Form")
+
         except Exception as e:
-            logger.info(f"Error inserting speed metrics into the local_database: {e}")
+            logger.info(f"Error submitting speed metrics to Google Form: {e}")
 
     def collect_ping_metrics(self):
         """Collect and store ping metrics."""
@@ -131,6 +129,9 @@ class NetworkMonitor:
             logger.info(f"No speedtest data found")
             return
         
+        metrics_data["site_id"] = self.site_id
+        metrics_data["location"] = self.location # Pass only the location string
+        
         for metric_name, query in SPEED_METRICS.items():
             result = self._query_prometheus(query)
             if result and 'data' in result and 'result' in result['data']:
@@ -143,18 +144,13 @@ class NetworkMonitor:
                         metrics_data[metric_name] = value
         
         if metrics_data:
+
+            logger.info(f"No speedtest data {metrics_data}")
             self._insert_speed_metrics(metrics_data)
     
-    def check_sync(self):
-        need_to_sync = local_database.get_if_need_to_sync()
-        if(need_to_sync):
-            remote_database.init_db()
-            remote_database.upload_ping_metrics()
-            remote_database.upload_speed_metrics()
+
 
 async def main():
-    local_database.init_db()
-    
     monitor = NetworkMonitor()
     
     # Schedule ping metrics collection every 5 minutes
@@ -162,10 +158,13 @@ async def main():
     
     # Schedule speedtest metrics collection every 60 minutes
     # (it will only insert data if new speedtest results are available)
-    schedule.every(15).minutes.do(monitor.collect_speed_metrics)
+    # schedule.every(60).minutes.do(monitor.collect_speed_metrics)
+    schedule.every(60).minutes.do(monitor.collect_speed_metrics)
 
-    monitor.check_sync()
-    schedule.every().day.do(monitor.check_sync)
+    
+    # Run initial collection
+    monitor.collect_ping_metrics()
+    monitor.collect_speed_metrics()
     
     # Keep the script running
     while True:
