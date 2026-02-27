@@ -1,6 +1,7 @@
 import requests
 import datetime
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +13,9 @@ PING_FORM_ENTRY_IDS = {
     "timestamp": "entry.1528372262",
     "ip_address": "entry.108902199",
     "location": "entry.1210248263",
+    "netsuite_up": "entry.188435571",
+    "cru_up": "entry.353707753",
+    "okta_up": "entry.388744467",
     "google_up": "entry.1234320055",
     "apple_up": "entry.1570063945",
     "pihole_up": "entry.2027274655",
@@ -37,7 +41,7 @@ SPEED_FORM_ENTRY_IDS = {
     "ip_addres": "entry.1588320435",
 }
 
-def submit_to_google_form(metrics_data, form_url, form_entry_ids):
+def format_data(metrics_data, form_url, form_entry_ids):
     """
     Submits collected metrics to the Google Form.
     """
@@ -48,23 +52,35 @@ def submit_to_google_form(metrics_data, form_url, form_entry_ids):
         if metric_name in form_entry_ids:
             form_data[form_entry_ids[metric_name]] = str(value)
         else:
-            logger.warning(f"Metric '{metric_name}' not found in form_entry_ids. Skipping.")
+            # logger.warning(f"Metric '{metric_name}' not found in form_entry_ids. Skipping.")
+    submit_to_google_form(form_data, form_url)
 
-    try:
-        response = requests.post(form_url, data=form_data)
-        response.raise_for_status()
-        logger.info(f"Successfully submitted data to Google Form. Response: {response.status_code}")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to submit data to Google Form: {e}")
+
+def submit_to_google_form(form_data, form_url, max_retries=3, delay_seconds=60):
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(form_url, data=form_data)
+            response.raise_for_status()
+            # logger.info(f"Successfully submitted data to Google Form. Response: {response.status_code}")
+            return
+        except requests.exceptions.RequestException as e:
+            if response is not None and response.status_code == 429:
+                logger.warning(f"Received 429 (Too Many Requests). Retrying in {delay_seconds} seconds... (Attempt {attempt + 1}/{max_retries})")
+                time.sleep(delay_seconds)
+            else:
+                logger.error(f"Failed to submit data to Google Form: {e}")
+                break
+    logger.error(f"Failed to submit data to Google Form after {max_retries} attempts.")
+
 
 def ping(metrics_data):
     """
     Collects and submits ping-related metrics to the Google Form.
     """
-    submit_to_google_form(metrics_data, PING_FORM_URL, PING_FORM_ENTRY_IDS)
+    submit_to_google_form(metrics_data, PING_FORM_URL)
 
 def speed(metrics_data):
     """
     Collects and submits speed-related metrics to the Google Form.
     """
-    submit_to_google_form(metrics_data, SPEED_FORM_URL, SPEED_FORM_ENTRY_IDS)
+    submit_to_google_form(metrics_data, SPEED_FORM_URL)
