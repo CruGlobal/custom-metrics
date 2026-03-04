@@ -56,23 +56,26 @@ def format_data(metrics_data, form_url, form_entry_ids):
     _send_form_request(form_data, form_url)
 
 
-def _send_form_request(form_data, form_url, max_retries=3, delay_seconds=60):
-    for attempt in range(max_retries):
-        try:
-            # logger.info(f"submiting data to Google Form. Response:")
-            response = requests.post(form_url, data=form_data)
-            response.raise_for_status()
-            # logger.info(f"Successfully submitted data to Google Form. Response: {response.status_code}")
-            return
-        except requests.exceptions.RequestException as e:
-            if response is not None and response.status_code == 429:
-                logger.warning(f"Received 429 (Too Many Requests). Retrying in {delay_seconds} seconds... (Attempt {attempt + 1}/{max_retries})")
-                time.sleep(delay_seconds)
-                _send_form_request(form_data, form_url, max_retries, delay_seconds)
-            else:
-                logger.error(f"Failed to submit data to Google Form: {e}")
-                break
-    logger.error(f"Failed to submit data to Google Form after {max_retries} attempts.")
+def _send_form_request(form_data, form_url, retries=3, delay_seconds=60):
+    response = None # Initialize response to None
+    try:
+        # logger.info(f"submiting data to Google Form. Response:")
+        response = requests.post(form_url, data=form_data)
+        response.raise_for_status()
+        # logger.info(f"Successfully submitted data to Google Form. Response: {response.status_code}")
+        return
+    except requests.exceptions.RequestException as e:
+        if e.response is not None and e.response.status_code == 429:
+            time.sleep(delay_seconds)
+            if retries <= 0:
+                # If it's the last attempt, report failure
+                logger.error(f"Failed to submit data to Google Form")
+                return
+            else: 
+                #  continue to the next attempt ß
+                logger.warning(f"Received 429 (Too Many Requests). Retrying in {delay_seconds} seconds... (retrying {retries-1} more times)")
+                return _send_form_request(form_data, form_url, retries-1, delay_seconds)
+
 
 
 def ping(metrics_data):

@@ -13,11 +13,11 @@ source venv/bin/activate
 pip3 install -r requirements.txt
 bash ./pi_rebuild.sh
 ```
-GOOGLE_APPLICATION_CREDENTIALS=./.secret.json python3 test_connection.py
 
 Create a `.env` file in the project root with the following variables
 ```bash
 LOCATION=your-location
+SITE_ID=your-site-id
 ```
 
 ## License

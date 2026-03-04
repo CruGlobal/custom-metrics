@@ -48,6 +48,8 @@ SPEED_METRICS = {
 class NetworkMonitor:
     def __init__(self):
         self.site_id = SITE_ID or LOCATION or "TEMP_TEST_DATA"
+        self.ip_address = None
+        self.location = None
         self._get_ip_and_location()
 
     def _get_ip_and_location(self):
@@ -67,6 +69,8 @@ class NetworkMonitor:
             return
         except Exception as e:
             logger.error(f"Failed to get IP and location: {e}")
+            self.ip_address = None
+            self.location = None
             return 
     
     def _get_or_create_site_id(self):

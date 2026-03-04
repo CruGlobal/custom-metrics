@@ -25,7 +25,7 @@ jobs:
 
       - name: Run tests
         run: |
-          python3 -m pytest tests/ -v
+          python -m unittest discover tests
 
       - name: Upload test results
         if: always()

@@ -1,4 +1,3 @@
-#!bin/bash
 
 source venv/bin/activate
-uv run -m unittest
+python -m unittest discover tests
