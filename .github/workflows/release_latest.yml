@@ -8,18 +8,9 @@ on:
 permissions:
   contents: write
 jobs:
-  # call-tests:
-  #   name: Test
-    # uses: ./.github/workflows/tests.yml
-
-  # call-bump-version:
-  #   name: Version
-  #   # Only run if tests pass
-  #   needs: [call-tests]
-  #   uses: ./.github/workflows/bump-version.yml
-  #   with:
-  #     ref: ${{ github.ref }}
-  #     pre_release: ${{ github.base_ref == 'develop' && 'dev' || '' }}
+  call-tests:
+    name: Test
+    uses: ./.github/workflows/tests.yml
 
   call-docker-build:
     name: Build
@@ -28,5 +19,5 @@ jobs:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
     with:
-      # platforms: linux/arm/v8,linux/amd64,linux/arm64
+      # platforms: linux/arm/v8
       tags: ${{ github.base_ref }},"master"

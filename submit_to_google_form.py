@@ -51,7 +51,7 @@ def format_data(metrics_data, form_url, form_entry_ids):
     for metric_name, value in metrics_data.items():
         if metric_name in form_entry_ids:
             form_data[form_entry_ids[metric_name]] = str(value)
-        else:
+        # else:
             # logger.warning(f"Metric '{metric_name}' not found in form_entry_ids. Skipping.")
     submit_to_google_form(form_data, form_url)
 
