@@ -38,7 +38,7 @@ SPEED_FORM_ENTRY_IDS = {
     "upload_mbps": "entry.306813776",
     "ping_ms": "entry.1963382231",
     "jitter_ms": "entry.1682369155",
-    "ip_addres": "entry.1588320435",
+    "ip_address": "entry.1588320435",
 }
 
 def format_data(metrics_data, form_url, form_entry_ids):
@@ -52,13 +52,14 @@ def format_data(metrics_data, form_url, form_entry_ids):
         if metric_name in form_entry_ids:
             form_data[form_entry_ids[metric_name]] = str(value)
         # else:
-            # logger.warning(f"Metric '{metric_name}' not found in form_entry_ids. Skipping.")
-    submit_to_google_form(form_data, form_url)
+        #     logger.warning(f"Metric '{metric_name}' not found in form_entry_ids. Skipping.")
+    _send_form_request(form_data, form_url)
 
 
-def submit_to_google_form(form_data, form_url, max_retries=3, delay_seconds=60):
+def _send_form_request(form_data, form_url, max_retries=3, delay_seconds=60):
     for attempt in range(max_retries):
         try:
+            # logger.info(f"submiting data to Google Form. Response:")
             response = requests.post(form_url, data=form_data)
             response.raise_for_status()
             # logger.info(f"Successfully submitted data to Google Form. Response: {response.status_code}")
@@ -67,6 +68,7 @@ def submit_to_google_form(form_data, form_url, max_retries=3, delay_seconds=60):
             if response is not None and response.status_code == 429:
                 logger.warning(f"Received 429 (Too Many Requests). Retrying in {delay_seconds} seconds... (Attempt {attempt + 1}/{max_retries})")
                 time.sleep(delay_seconds)
+                _send_form_request(form_data, form_url, max_retries, delay_seconds)
             else:
                 logger.error(f"Failed to submit data to Google Form: {e}")
                 break
@@ -77,10 +79,10 @@ def ping(metrics_data):
     """
     Collects and submits ping-related metrics to the Google Form.
     """
-    submit_to_google_form(metrics_data, PING_FORM_URL)
+    format_data(metrics_data, PING_FORM_URL, PING_FORM_ENTRY_IDS)
 
 def speed(metrics_data):
     """
     Collects and submits speed-related metrics to the Google Form.
     """
-    submit_to_google_form(metrics_data, SPEED_FORM_URL)
+    format_data(metrics_data, SPEED_FORM_URL, SPEED_FORM_ENTRY_IDS)

@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 # ! This can be mapped in the internet pi stack "/etc/network-monitor/site_id"
 LOCATION = os.getenv("LOCATION", "Isenguard")
+SITE_ID = os.getenv("SITE_ID", "Isenguard")
 SITE_ID_FILE = "network-monitor/site_id"
 
 # Ping metrics to collect every 5 minutes
@@ -46,7 +47,7 @@ SPEED_METRICS = {
 
 class NetworkMonitor:
     def __init__(self):
-        self.site_id = LOCATION or "TEMP_TEST_DATA"
+        self.site_id = SITE_ID or LOCATION or "TEMP_TEST_DATA"
         self._get_ip_and_location()
 
     def _get_ip_and_location(self):
@@ -60,8 +61,9 @@ class NetworkMonitor:
             city = data.get("city", "unknown")
             region = data.get("region", "unknown")
             country = data.get("country", "unknown")
-            self.location = f"{self.site_id}, {city}, {region}, {country}"
-            self.ip = ip
+            self.location = f"{LOCATION}, {city}, {region}, {country}"
+            self.ip_address = ip
+            # logger.error(f"{LOCATION}, {city}, {region}, {country}")
             return
         except Exception as e:
             logger.error(f"Failed to get IP and location: {e}")
@@ -98,7 +100,8 @@ class NetworkMonitor:
         try:
             # Add site_id and location to metrics_data
             metrics_data["site_id"] = self.site_id
-            metrics_data["location"] = self.location # Pass only the location string
+            metrics_data["location"] = self.location # 
+            metrics_data["ip_address"] = self.ip_address # 
             
             ping(metrics_data)
             # logger.info(f"Successfully submitted {len(metrics_data)} ping metrics to Google Form")
@@ -110,7 +113,8 @@ class NetworkMonitor:
         try:
             # Add site_id and location to metrics_data
             metrics_data["site_id"] = self.site_id
-            metrics_data["location"] = self.location # Pass only the location string
+            metrics_data["location"] = self.location 
+            metrics_data["ip_address"] = self.ip_address 
             
             speed(metrics_data)
             # logger.info(f"Successfully submitted {len(metrics_data)} speed metrics to Google Form")
@@ -135,6 +139,7 @@ class NetworkMonitor:
                         metrics_data[metric_name] = value
         
         if metrics_data:
+            # logger.info(f"Found ping data {metrics_data}")
             self._insert_ping_metrics(metrics_data)
 
     def collect_speed_metrics(self):
@@ -169,9 +174,9 @@ class NetworkMonitor:
 
 async def main():
     logger.info(f"Starting main.py in custom-metrics")
-
     monitor = NetworkMonitor()
     
+    # monitor.collect_ping_metrics()
     # Schedule ping metrics collection every 5 minutes
     schedule.every(5).minutes.do(monitor.collect_ping_metrics)
     
