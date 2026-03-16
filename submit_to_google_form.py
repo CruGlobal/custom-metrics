@@ -9,8 +9,8 @@ PING_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdKfiAaWkccMGS8tdpHZx6
 SPEED_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSe0KNSxoVx1eZKQzThy9du1f5b1QXI1RBkuZHjIRxY7e74vJA/formResponse"
 
 PING_FORM_ENTRY_IDS = {
-    "site_id": "entry.340984991",
-    "timestamp": "entry.1528372262",
+    "device_id": "entry.340984991",
+    "local_timestamp": "entry.1528372262",
     "ip_address": "entry.108902199",
     "location": "entry.1210248263",
     "netsuite_up": "entry.188435571",
@@ -30,9 +30,9 @@ PING_FORM_ENTRY_IDS = {
 }
 
 SPEED_FORM_ENTRY_IDS = {
-    "site_id": "entry.1089427232",
+    "device_id": "entry.1089427232",
     "siteid": "entry.1089427232",
-    "timestamp": "entry.17901975",
+    "local_timestamp": "entry.17901975",
     "location": "entry.389737321",
     "download_mbps": "entry.1429602019",
     "upload_mbps": "entry.306813776",
@@ -46,7 +46,7 @@ def format_data(metrics_data, form_url, form_entry_ids):
     Submits collected metrics to the Google Form.
     """
     form_data = {}
-    form_data[form_entry_ids["timestamp"]] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    form_data[form_entry_ids["local_timestamp"]] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     for metric_name, value in metrics_data.items():
         if metric_name in form_entry_ids:

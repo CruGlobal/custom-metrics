@@ -37,7 +37,7 @@ __init__.py
 
 # Project specific
 *.log
-site_id
+device_id
 credentials.json
 *.pem
 *.key

@@ -17,7 +17,7 @@ bash ./pi_rebuild.sh
 Create a `.env` file in the project root with the following variables
 ```bash
 LOCATION=your-location
-SITE_ID=your-site-id
+DEVICE_ID=your-site-id
 ```
 
 ## License

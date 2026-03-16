@@ -14,10 +14,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ! This can be mapped in the internet pi stack "/etc/network-monitor/site_id"
+# ! This can be mapped in the internet pi stack "/etc/network-monitor/device_id"
 LOCATION = os.getenv("LOCATION", "Isenguard")
-SITE_ID = os.getenv("SITE_ID", "Isenguard")
-SITE_ID_FILE = "network-monitor/site_id"
+DEVICE_ID = os.getenv("DEVICE_ID", "A_lost_palantir")
+DEVICE_ID_FILE = "network-monitor/device_id"
 
 # Ping metrics to collect every 5 minutes
 PING_METRICS = {
@@ -47,7 +47,7 @@ SPEED_METRICS = {
 
 class NetworkMonitor:
     def __init__(self):
-        self.site_id = SITE_ID or LOCATION or "TEMP_TEST_DATA"
+        self.device_id = DEVICE_ID or LOCATION or "TEMP_TEST_DATA"
         self.ip_address = None
         self.location = None
         self._get_ip_and_location()
@@ -73,17 +73,17 @@ class NetworkMonitor:
             self.location = None
             return 
     
-    def _get_or_create_site_id(self):
+    def _get_or_create_device_id(self):
         """Get existing site ID or create a new one."""
-        if os.path.exists(SITE_ID_FILE):
-            with open(SITE_ID_FILE, 'r') as f:
+        if os.path.exists(DEVICE_ID_FILE):
+            with open(DEVICE_ID_FILE, 'r') as f:
                 return f.read().strip()
         else:
-            site_id = str(uuid.uuid4())
-            os.makedirs(os.path.dirname(SITE_ID_FILE), exist_ok=True)
-            with open(SITE_ID_FILE, 'w') as f:
-                f.write(site_id)
-            return site_id
+            device_id = str(uuid.uuid4())
+            os.makedirs(os.path.dirname(DEVICE_ID_FILE), exist_ok=True)
+            with open(DEVICE_ID_FILE, 'w') as f:
+                f.write(device_id)
+            return device_id
 
     def _query_prometheus(self, query):
         """Query Prometheus for metrics."""
@@ -102,8 +102,8 @@ class NetworkMonitor:
     def _insert_ping_metrics(self, metrics_data):
         """Insert ping metrics directly into the sheet."""
         try:
-            # Add site_id and location to metrics_data
-            metrics_data["site_id"] = self.site_id
+            # Add device_id and location to metrics_data
+            metrics_data["device_id"] = self.device_id
             metrics_data["location"] = self.location # 
             metrics_data["ip_address"] = self.ip_address # 
             
@@ -115,8 +115,8 @@ class NetworkMonitor:
     def _insert_speed_metrics(self, metrics_data):
         """Insert speedtest metrics directly into the form."""
         try:
-            # Add site_id and location to metrics_data
-            metrics_data["site_id"] = self.site_id
+            # Add device_id and location to metrics_data
+            metrics_data["device_id"] = self.device_id
             metrics_data["location"] = self.location 
             metrics_data["ip_address"] = self.ip_address 
             
@@ -157,7 +157,7 @@ class NetworkMonitor:
             logger.info(f"No speedtest data found")
             return
         
-        metrics_data["site_id"] = self.site_id
+        metrics_data["device_id"] = self.device_id
         metrics_data["location"] = self.location # Pass only the location string
         
         for metric_name, query in SPEED_METRICS.items():

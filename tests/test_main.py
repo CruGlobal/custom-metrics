@@ -15,20 +15,20 @@ import submit_to_google_form
 class TestNetworkMonitor(unittest.TestCase):
 
     @patch.object(NetworkMonitor, '_get_ip_and_location')
-    @patch.object(NetworkMonitor, '_get_or_create_site_id', return_value="mock_site_id")
-    def setUp(self, mock_get_or_create_site_id, mock_get_ip_and_location):
-        # Ensure a clean state for environment variables and site_id file
+    @patch.object(NetworkMonitor, '_get_or_create_device_id', return_value="mock_device_id")
+    def setUp(self, mock_get_or_create_device_id, mock_get_ip_and_location):
+        # Ensure a clean state for environment variables and device_id file
         self.original_location_env = os.getenv("LOCATION")
-        self.original_site_id_env = os.getenv("SITE_ID")
+        self.original_device_id_env = os.getenv("DEVICE_ID")
         self.original_prometheus_url_env = os.getenv("PROMETHEUS_URL")
 
         os.environ["LOCATION"] = "TestLocation"
-        os.environ["SITE_ID"] = "TestSiteID"
+        os.environ["DEVICE_ID"] = "TestSiteID"
         os.environ["PROMETHEUS_URL"] = "http://mock-prometheus:9090"
 
-        # Clean up any existing site_id file before each test
-        if os.path.exists("network-monitor/site_id"):
-            os.remove("network-monitor/site_id")
+        # Clean up any existing device_id file before each test
+        if os.path.exists("network-monitor/device_id"):
+            os.remove("network-monitor/device_id")
         if os.path.exists("network-monitor"):
             os.rmdir("network-monitor")
 
@@ -40,11 +40,11 @@ class TestNetworkMonitor(unittest.TestCase):
             if "LOCATION" in os.environ:
                 del os.environ["LOCATION"]
 
-        if self.original_site_id_env is not None:
-            os.environ["SITE_ID"] = self.original_site_id_env
+        if self.original_device_id_env is not None:
+            os.environ["DEVICE_ID"] = self.original_device_id_env
         else:
-            if "SITE_ID" in os.environ:
-                del os.environ["SITE_ID"]
+            if "DEVICE_ID" in os.environ:
+                del os.environ["DEVICE_ID"]
 
         if self.original_prometheus_url_env is not None:
             os.environ["PROMETHEUS_URL"] = self.original_prometheus_url_env
@@ -52,45 +52,45 @@ class TestNetworkMonitor(unittest.TestCase):
             if "PROMETHEUS_URL" in os.environ:
                 del os.environ["PROMETHEUS_URL"]
 
-        # Clean up any created site_id file after each test
-        if os.path.exists("network-monitor/site_id"):
-            os.remove("network-monitor/site_id")
+        # Clean up any created device_id file after each test
+        if os.path.exists("network-monitor/device_id"):
+            os.remove("network-monitor/device_id")
         if os.path.exists("network-monitor"):
             os.rmdir("network-monitor")
 
     @patch('requests.get', side_effect=requests.exceptions.RequestException("Test Error"))
-    @patch.object(NetworkMonitor, '_get_or_create_site_id', return_value="mock_site_id") # Mock this to prevent file ops
-    def test_get_ip_and_location_failure(self, mock_get_or_create_site_id, mock_get):
+    @patch.object(NetworkMonitor, '_get_or_create_device_id', return_value="mock_device_id") # Mock this to prevent file ops
+    def test_get_ip_and_location_failure(self, mock_get_or_create_device_id, mock_get):
         monitor = NetworkMonitor()
         monitor._get_ip_and_location()
         self.assertIsNone(monitor.ip_address)
         self.assertIsNone(monitor.location)
 
     @patch('os.path.exists')
-    @patch('builtins.open', new_callable=mock_open, read_data="existing_site_id")
+    @patch('builtins.open', new_callable=mock_open, read_data="existing_device_id")
     @patch.object(NetworkMonitor, '__init__', return_value=None) # Mock __init__ to prevent side effects
-    def test_get_or_create_site_id_exists(self, mock_init, mock_file, mock_exists):
+    def test_get_or_create_device_id_exists(self, mock_init, mock_file, mock_exists):
         mock_exists.return_value = True
         monitor = NetworkMonitor()
-        monitor.site_id = "mock_site_id" # Manually set site_id as __init__ is mocked
-        site_id = monitor._get_or_create_site_id()
-        self.assertEqual(site_id, "existing_site_id")
-        mock_exists.assert_called_once_with("network-monitor/site_id")
-        mock_file.assert_called_once_with("network-monitor/site_id", 'r')
+        monitor.device_id = "mock_device_id" # Manually set device_id as __init__ is mocked
+        device_id = monitor._get_or_create_device_id()
+        self.assertEqual(device_id, "existing_device_id")
+        mock_exists.assert_called_once_with("network-monitor/device_id")
+        mock_file.assert_called_once_with("network-monitor/device_id", 'r')
 
     @patch('os.path.exists')
     @patch('os.makedirs')
     @patch('builtins.open', new_callable=mock_open)
     @patch('uuid.uuid4', return_value=uuid.UUID('12345678-1234-5678-1234-567812345678'))
     @patch.object(NetworkMonitor, '__init__', return_value=None) # Mock __init__ to prevent side effects
-    def test_get_or_create_site_id_creates_new(self, mock_init, mock_uuid, mock_file, mock_makedirs, mock_exists):
+    def test_get_or_create_device_id_creates_new(self, mock_init, mock_uuid, mock_file, mock_makedirs, mock_exists):
         mock_exists.return_value = False
         monitor = NetworkMonitor()
-        monitor.site_id = "mock_site_id" # Manually set site_id as __init__ is mocked
-        site_id = monitor._get_or_create_site_id()
-        self.assertEqual(site_id, "12345678-1234-5678-1234-567812345678")
+        monitor.device_id = "mock_device_id" # Manually set device_id as __init__ is mocked
+        device_id = monitor._get_or_create_device_id()
+        self.assertEqual(device_id, "12345678-1234-5678-1234-567812345678")
         mock_makedirs.assert_called_once_with("network-monitor", exist_ok=True)
-        mock_file.assert_called_once_with("network-monitor/site_id", 'w')
+        mock_file.assert_called_once_with("network-monitor/device_id", 'w')
         mock_file().write.assert_called_once_with("12345678-1234-5678-1234-567812345678")
 
     @patch('requests.get')
@@ -115,7 +115,7 @@ class TestNetworkMonitor(unittest.TestCase):
     @patch('main.ping') # Correct patch target
     def test_insert_ping_metrics(self, mock_ping):
         monitor = NetworkMonitor()
-        monitor.site_id = "test_site_id"
+        monitor.device_id = "test_device_id"
         monitor.location = "test_location"
         monitor.ip_address = "1.1.1.1"
         metrics_data = {"metric1": 1, "metric2": 0.5}
@@ -124,7 +124,7 @@ class TestNetworkMonitor(unittest.TestCase):
         expected_metrics_data = {
             "metric1": 1,
             "metric2": 0.5,
-            "site_id": "test_site_id",
+            "device_id": "test_device_id",
             "location": "test_location",
             "ip_address": "1.1.1.1"
         }
@@ -133,7 +133,7 @@ class TestNetworkMonitor(unittest.TestCase):
     @patch('main.speed') # Correct patch target
     def test_insert_speed_metrics(self, mock_speed):
         monitor = NetworkMonitor()
-        monitor.site_id = "test_site_id"
+        monitor.device_id = "test_device_id"
         monitor.location = "test_location"
         monitor.ip_address = "1.1.1.1"
         metrics_data = {"download_mbps": 100, "upload_mbps": 50}
@@ -142,7 +142,7 @@ class TestNetworkMonitor(unittest.TestCase):
         expected_metrics_data = {
             "download_mbps": 100,
             "upload_mbps": 50,
-            "site_id": "test_site_id",
+            "device_id": "test_device_id",
             "location": "test_location",
             "ip_address": "1.1.1.1"
         }
@@ -169,7 +169,7 @@ class TestNetworkMonitor(unittest.TestCase):
             {"data": {"result": [{"value": [0, "0.2"]}]}}, # http_duration
         ]
         monitor = NetworkMonitor()
-        monitor.site_id = "test_site_id"
+        monitor.device_id = "test_device_id"
         monitor.location = "test_location"
         monitor.ip_address = "1.1.1.1"
         monitor.collect_ping_metrics()
@@ -201,13 +201,13 @@ class TestNetworkMonitor(unittest.TestCase):
         ]
 
         monitor = NetworkMonitor()
-        monitor.site_id = "test_site_id"
+        monitor.device_id = "test_device_id"
         monitor.location = "test_location"
         monitor.ip_address = "1.1.1.1"
         monitor.collect_speed_metrics()
 
         expected_metrics = {
-            "site_id": "test_site_id",
+            "device_id": "test_device_id",
             "location": "test_location",
             "download_mbps": 100.0, # Converted from bits to Mbps
             "upload_mbps": 50.0,    # Converted from bits to Mbps
