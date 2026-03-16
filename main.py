@@ -63,7 +63,8 @@ class NetworkMonitor:
             city = data.get("city", "unknown")
             region = data.get("region", "unknown")
             country = data.get("country", "unknown")
-            self.location = f"{LOCATION}, {city}, {region}, {country}"
+            # self.location = f"{LOCATION}, {city}, {region}, {country}"
+            self.location = f"{LOCATION}"
             self.ip_address = ip
             # logger.error(f"{LOCATION}, {city}, {region}, {country}")
             return
