@@ -48,7 +48,8 @@ class TestGoogleForm(unittest.TestCase):
             "location": "test_location_speed",
             "download_mbps": 100.5,
             "upload_mbps": 50.2,
-            "ip_address": "127.0.0.1"
+            "ip_address": "127.0.0.1",
+            "uptime": 12345.0,
         }
 
         with patch('datetime.datetime') as mock_datetime:
@@ -65,7 +66,8 @@ class TestGoogleForm(unittest.TestCase):
                 SPEED_FORM_ENTRY_IDS["location"]: "test_location_speed",
                 SPEED_FORM_ENTRY_IDS["download_mbps"]: "100.5",
                 SPEED_FORM_ENTRY_IDS["upload_mbps"]: "50.2",
-                SPEED_FORM_ENTRY_IDS["ip_address"]: "127.0.0.1"
+                SPEED_FORM_ENTRY_IDS["ip_address"]: "127.0.0.1",
+                SPEED_FORM_ENTRY_IDS["uptime"]: "12345.0",
             }
             mock_send_form_request.assert_called_once_with(expected_form_data, SPEED_FORM_URL)
 

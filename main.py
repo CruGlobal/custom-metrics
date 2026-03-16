@@ -42,7 +42,8 @@ SPEED_METRICS = {
     "download_mbps": 'speedtest_download_bits_per_second{job="speedtest"}',
     "upload_mbps": 'speedtest_upload_bits_per_second{job="speedtest"}',
     "ping_ms": 'speedtest_ping_latency_milliseconds{job="speedtest"}',
-    "jitter_ms": 'speedtest_jitter_latency_milliseconds{job="speedtest"}'
+    "jitter_ms": 'speedtest_jitter_latency_milliseconds{job="speedtest"}',
+    "uptime": "time() - node_boot_time_seconds{job=\"node\"}"
 }
 
 class NetworkMonitor:
@@ -157,20 +158,20 @@ class NetworkMonitor:
         if not speedtest_up_result or 'data' not in speedtest_up_result or not speedtest_up_result['data']['result']:
             logger.info(f"No speedtest data found")
             return
-        
+
         metrics_data["device_id"] = self.device_id
         metrics_data["location"] = self.location # Pass only the location string
         
         for metric_name, query in SPEED_METRICS.items():
             result = self._query_prometheus(query)
-            if result and 'data' in result and 'result' in result['data']:
-                for r in result['data']['result']:
-                    value = float(r['value'][1])
-                    # Convert bits to Mbps for speed metrics
-                    if metric_name in ['download_mbps', 'upload_mbps']:
-                        metrics_data[metric_name] = value / 1_000_000
-                    else:
-                        metrics_data[metric_name] = value
+            if result and 'data' in result and 'result' in result['data'] and result['data']['result']:
+                r = result['data']['result'][0]
+                value = float(r['value'][1])
+                # Convert bits to Mbps for speed metrics
+                if metric_name in ['download_mbps', 'upload_mbps']:
+                    metrics_data[metric_name] = value / 1_000_000
+                else:
+                    metrics_data[metric_name] = value
         if metrics_data:
             # logger.info(f"Found speedtest data {metrics_data}")
             self._insert_speed_metrics(metrics_data)

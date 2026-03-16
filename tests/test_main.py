@@ -198,6 +198,7 @@ class TestNetworkMonitor(unittest.TestCase):
             {"data": {"result": [{"value": [0, "50000000"]}]}},  # upload_mbps
             {"data": {"result": [{"value": [0, "25.5"]}]}},      # ping_ms
             {"data": {"result": [{"value": [0, "5.1"]}]}},       # jitter_ms
+            {"data": {"result": [{"value": [0, "86400.0"]}]}},   # uptime (seconds)
         ]
 
         monitor = NetworkMonitor()
@@ -212,7 +213,8 @@ class TestNetworkMonitor(unittest.TestCase):
             "download_mbps": 100.0, # Converted from bits to Mbps
             "upload_mbps": 50.0,    # Converted from bits to Mbps
             "ping_ms": 25.5,
-            "jitter_ms": 5.1
+            "jitter_ms": 5.1,
+            "uptime": 86400.0,
         }
         mock_insert_speed_metrics.assert_called_once_with(expected_metrics)
 
