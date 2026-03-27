@@ -9,13 +9,13 @@ from submit_to_google_form import ping, speed
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 # ! This can be mapped in the internet pi stack "/etc/network-monitor/device_id"
 LOCATION = os.getenv("LOCATION", "Isenguard")
+SITE_ID = os.getenv("SITE_ID", "A_lost_palantir")
 DEVICE_ID = os.getenv("DEVICE_ID", "A_lost_palantir")
 DEVICE_ID_FILE = "network-monitor/device_id"
 
@@ -34,7 +34,8 @@ PING_METRICS = {
     "http_samples": "scrape_samples_scraped{job='ping'}",
     "http_time": "scrape_duration_seconds{job='ping'}",
     "http_content_length": 'probe_http_uncompressed_body_length{job="ping"}',
-    "http_duration": 'probe_duration_seconds{job="ping"}'
+    "http_duration": 'probe_duration_seconds{job="ping"}',
+    "uptime": 'time() - node_boot_time_seconds{job="node"}',
 }
 
 # Speedtest metrics to collect when available
@@ -43,12 +44,13 @@ SPEED_METRICS = {
     "upload_mbps": 'speedtest_upload_bits_per_second{job="speedtest"}',
     "ping_ms": 'speedtest_ping_latency_milliseconds{job="speedtest"}',
     "jitter_ms": 'speedtest_jitter_latency_milliseconds{job="speedtest"}',
-    "uptime": "time() - node_boot_time_seconds{job=\"node\"}"
+    "uptime": 'time() - node_boot_time_seconds{job="node"}',
 }
+
 
 class NetworkMonitor:
     def __init__(self):
-        self.device_id = DEVICE_ID or LOCATION or "TEMP_TEST_DATA"
+        self.device_id = DEVICE_ID or SITE_ID or LOCATION or "TEMP_TEST_DATA"
         self.ip_address = None
         self.location = None
         self._get_ip_and_location()
@@ -60,7 +62,7 @@ class NetworkMonitor:
             response.raise_for_status()
             data = response.json()
             ip = data.get("ip")
-            
+
             city = data.get("city", "unknown")
             region = data.get("region", "unknown")
             country = data.get("country", "unknown")
@@ -73,17 +75,17 @@ class NetworkMonitor:
             logger.error(f"Failed to get IP and location: {e}")
             self.ip_address = None
             self.location = None
-            return 
-    
+            return
+
     def _get_or_create_device_id(self):
         """Get existing site ID or create a new one."""
         if os.path.exists(DEVICE_ID_FILE):
-            with open(DEVICE_ID_FILE, 'r') as f:
+            with open(DEVICE_ID_FILE, "r") as f:
                 return f.read().strip()
         else:
             device_id = str(uuid.uuid4())
             os.makedirs(os.path.dirname(DEVICE_ID_FILE), exist_ok=True)
-            with open(DEVICE_ID_FILE, 'w') as f:
+            with open(DEVICE_ID_FILE, "w") as f:
                 f.write(device_id)
             return device_id
 
@@ -92,8 +94,7 @@ class NetworkMonitor:
         try:
             prometheus_url = os.getenv("PROMETHEUS_URL", "http://prometheus:9090")
             response = requests.get(
-                f"{prometheus_url}/api/v1/query",
-                params={"query": query}
+                f"{prometheus_url}/api/v1/query", params={"query": query}
             )
             response.raise_for_status()
             return response.json()
@@ -106,9 +107,9 @@ class NetworkMonitor:
         try:
             # Add device_id and location to metrics_data
             metrics_data["device_id"] = self.device_id
-            metrics_data["location"] = self.location # 
-            metrics_data["ip_address"] = self.ip_address # 
-            
+            metrics_data["location"] = self.location  #
+            metrics_data["ip_address"] = self.ip_address  #
+
             ping(metrics_data)
             # logger.info(f"Successfully submitted {len(metrics_data)} ping metrics to Google Form")
         except Exception as e:
@@ -119,9 +120,9 @@ class NetworkMonitor:
         try:
             # Add device_id and location to metrics_data
             metrics_data["device_id"] = self.device_id
-            metrics_data["location"] = self.location 
-            metrics_data["ip_address"] = self.ip_address 
-            
+            metrics_data["location"] = self.location
+            metrics_data["ip_address"] = self.ip_address
+
             speed(metrics_data)
             # logger.info(f"Successfully submitted {len(metrics_data)} speed metrics to Google Form")
 
@@ -132,18 +133,25 @@ class NetworkMonitor:
         """Collect and store ping metrics."""
         # logger.info("Collecting ping metrics...")
         metrics_data = {}
-        
+
         for metric_name, query in PING_METRICS.items():
             result = self._query_prometheus(query)
-            if result and 'data' in result and 'result' in result['data']:
-                for r in result['data']['result']:
-                    value = float(r['value'][1])
+            if result and "data" in result and "result" in result["data"]:
+                for r in result["data"]["result"]:
+                    value = float(r["value"][1])
                     # Convert 'up' metrics to integer (0 or 1)
-                    if metric_name in ["google_up", "apple_up", "github_up", "pihole_up", "node_up", "speedtest_up"]:
+                    if metric_name in [
+                        "google_up",
+                        "apple_up",
+                        "github_up",
+                        "pihole_up",
+                        "node_up",
+                        "speedtest_up",
+                    ]:
                         metrics_data[metric_name] = int(value)
                     else:
                         metrics_data[metric_name] = value
-        
+
         if metrics_data:
             # logger.info(f"Found ping data {metrics_data}")
             self._insert_ping_metrics(metrics_data)
@@ -152,54 +160,62 @@ class NetworkMonitor:
         """Collect and store speedtest metrics if available."""
         # logger.info("Checking for speedtest metrics...")
         metrics_data = {}
-        
+
         # First check if speedtest is up
         speedtest_up_result = self._query_prometheus(SPEED_METRICS["download_mbps"])
-        if not speedtest_up_result or 'data' not in speedtest_up_result or not speedtest_up_result['data']['result']:
+        if (
+            not speedtest_up_result
+            or "data" not in speedtest_up_result
+            or not speedtest_up_result["data"]["result"]
+        ):
             logger.info(f"No speedtest data found")
             return
 
         metrics_data["device_id"] = self.device_id
-        metrics_data["location"] = self.location # Pass only the location string
-        
+        metrics_data["location"] = self.location  # Pass only the location string
+
         for metric_name, query in SPEED_METRICS.items():
             result = self._query_prometheus(query)
-            if result and 'data' in result and 'result' in result['data'] and result['data']['result']:
-                r = result['data']['result'][0]
-                value = float(r['value'][1])
+            if (
+                result
+                and "data" in result
+                and "result" in result["data"]
+                and result["data"]["result"]
+            ):
+                r = result["data"]["result"][0]
+                value = float(r["value"][1])
                 # Convert bits to Mbps for speed metrics
-                if metric_name in ['download_mbps', 'upload_mbps']:
+                if metric_name in ["download_mbps", "upload_mbps"]:
                     metrics_data[metric_name] = value / 1_000_000
                 else:
                     metrics_data[metric_name] = value
         if metrics_data:
             # logger.info(f"Found speedtest data {metrics_data}")
             self._insert_speed_metrics(metrics_data)
-    
 
 
 async def main():
     logger.info(f"Starting main.py in custom-metrics")
     monitor = NetworkMonitor()
-    
+
     # monitor.collect_ping_metrics()
     # Schedule ping metrics collection every 5 minutes
     schedule.every(5).minutes.do(monitor.collect_ping_metrics)
-    
+
     # Schedule speedtest metrics collection every 60 minutes
     # (it will only insert data if new speedtest results are available)
     # schedule.every(60).minutes.do(monitor.collect_speed_metrics)
     schedule.every(60).minutes.do(monitor.collect_speed_metrics)
 
-    
     # Run initial collection
     monitor.collect_ping_metrics()
     monitor.collect_speed_metrics()
-    
+
     # Keep the script running
     while True:
         await asyncio.sleep(1)
         schedule.run_pending()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

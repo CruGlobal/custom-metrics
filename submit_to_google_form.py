@@ -27,6 +27,7 @@ PING_FORM_ENTRY_IDS = {
     "http_time": "entry.1194873277",
     "http_content_length": "entry.739476608",
     "http_duration": "entry.752185240",
+    "uptime": "entry.1429387203",
 }
 
 SPEED_FORM_ENTRY_IDS = {
@@ -40,15 +41,17 @@ SPEED_FORM_ENTRY_IDS = {
     "jitter_ms": "entry.1682369155",
     "ip_address": "entry.1588320435",
     "uptime": "entry.693289137",
-    
 }
+
 
 def format_data(metrics_data, form_url, form_entry_ids):
     """
     Submits collected metrics to the Google Form.
     """
     form_data = {}
-    form_data[form_entry_ids["local_timestamp"]] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    form_data[form_entry_ids["local_timestamp"]] = datetime.datetime.now().strftime(
+        "%Y-%m-%d %H:%M:%S"
+    )
 
     for metric_name, value in metrics_data.items():
         if metric_name in form_entry_ids:
@@ -59,7 +62,7 @@ def format_data(metrics_data, form_url, form_entry_ids):
 
 
 def _send_form_request(form_data, form_url, retries=3, delay_seconds=60):
-    response = None # Initialize response to None
+    response = None  # Initialize response to None
     try:
         # logger.info(f"submiting data to Google Form. Response:")
         response = requests.post(form_url, data=form_data)
@@ -73,11 +76,14 @@ def _send_form_request(form_data, form_url, retries=3, delay_seconds=60):
                 # If it's the last attempt, report failure
                 logger.error(f"Failed to submit data to Google Form")
                 return
-            else: 
+            else:
                 #  continue to the next attempt ß
-                logger.warning(f"Received 429 (Too Many Requests). Retrying in {delay_seconds} seconds... (retrying {retries-1} more times)")
-                return _send_form_request(form_data, form_url, retries-1, delay_seconds)
-
+                logger.warning(
+                    f"Received 429 (Too Many Requests). Retrying in {delay_seconds} seconds... (retrying {retries - 1} more times)"
+                )
+                return _send_form_request(
+                    form_data, form_url, retries - 1, delay_seconds
+                )
 
 
 def ping(metrics_data):
@@ -85,6 +91,7 @@ def ping(metrics_data):
     Collects and submits ping-related metrics to the Google Form.
     """
     format_data(metrics_data, PING_FORM_URL, PING_FORM_ENTRY_IDS)
+
 
 def speed(metrics_data):
     """
