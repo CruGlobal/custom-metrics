@@ -40,7 +40,7 @@ SPEED_FORM_ENTRY_IDS = {
     "ping_ms": "entry.1963382231",
     "jitter_ms": "entry.1682369155",
     "ip_address": "entry.1588320435",
-    "uptime": "entry.693289137",
+    # "uptime": "entry.693289137",
 }
 
 
@@ -49,8 +49,8 @@ def format_data(metrics_data, form_url, form_entry_ids):
     Submits collected metrics to the Google Form.
     """
     form_data = {}
-    form_data[form_entry_ids["local_timestamp"]] = datetime.datetime.now().strftime(
-        "%Y-%m-%d %H:%M:%S"
+    form_data[form_entry_ids["local_timestamp"]] = (
+        datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     )
 
     for metric_name, value in metrics_data.items():
