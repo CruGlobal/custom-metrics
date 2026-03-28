@@ -11,11 +11,11 @@ SPEED_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSe0KNSxoVx1eZKQzThy9d
 PING_FORM_ENTRY_IDS = {
     "device_id": "entry.340984991",
     "local_timestamp": "entry.1528372262",
-    "ip_address": "entry.108902199",
+    # "ip_address": "entry.108902199",
     "location": "entry.1210248263",
     "netsuite_up": "entry.188435571",
     "cru_up": "entry.353707753",
-    "okta_up": "entry.388744467",
+    # "okta_up": "entry.388744467",
     "google_up": "entry.1234320055",
     "apple_up": "entry.1570063945",
     "pihole_up": "entry.2027274655",
@@ -39,7 +39,7 @@ SPEED_FORM_ENTRY_IDS = {
     "upload_mbps": "entry.306813776",
     "ping_ms": "entry.1963382231",
     "jitter_ms": "entry.1682369155",
-    "ip_address": "entry.1588320435",
+    # "ip_address": "entry.1588320435",
     # "uptime": "entry.693289137",
 }
 
@@ -49,9 +49,9 @@ def format_data(metrics_data, form_url, form_entry_ids):
     Submits collected metrics to the Google Form.
     """
     form_data = {}
-    form_data[form_entry_ids["local_timestamp"]] = (
-        datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
-    )
+    form_data[form_entry_ids["local_timestamp"]] = datetime.datetime.now(
+        datetime.timezone.utc
+    ).strftime("%Y-%m-%d %H:%M:%S")
 
     for metric_name, value in metrics_data.items():
         if metric_name in form_entry_ids:

@@ -51,31 +51,7 @@ SPEED_METRICS = {
 class NetworkMonitor:
     def __init__(self):
         self.device_id = DEVICE_ID or SITE_ID or LOCATION or "TEMP_TEST_DATA"
-        self.ip_address = None
-        self.location = None
-        self._get_ip_and_location()
-
-    def _get_ip_and_location(self):
-        """public IP address and location."""
-        try:
-            response = requests.get("https://ipinfo.io/json")
-            response.raise_for_status()
-            data = response.json()
-            ip = data.get("ip")
-
-            city = data.get("city", "unknown")
-            region = data.get("region", "unknown")
-            country = data.get("country", "unknown")
-            # self.location = f"{LOCATION}, {city}, {region}, {country}"
-            self.location = f"{LOCATION}"
-            self.ip_address = ip
-            # logger.error(f"{LOCATION}, {city}, {region}, {country}")
-            return
-        except Exception as e:
-            logger.error(f"Failed to get IP and location: {e}")
-            self.ip_address = None
-            self.location = None
-            return
+        self.location = f"{LOCATION}"
 
     def _get_or_create_device_id(self):
         """Get existing site ID or create a new one."""
@@ -108,7 +84,6 @@ class NetworkMonitor:
             # Add device_id and location to metrics_data
             metrics_data["device_id"] = self.device_id
             metrics_data["location"] = self.location  #
-            metrics_data["ip_address"] = self.ip_address  #
 
             ping(metrics_data)
             # logger.info(f"Successfully submitted {len(metrics_data)} ping metrics to Google Form")
@@ -121,7 +96,6 @@ class NetworkMonitor:
             # Add device_id and location to metrics_data
             metrics_data["device_id"] = self.device_id
             metrics_data["location"] = self.location
-            metrics_data["ip_address"] = self.ip_address
 
             speed(metrics_data)
             # logger.info(f"Successfully submitted {len(metrics_data)} speed metrics to Google Form")
