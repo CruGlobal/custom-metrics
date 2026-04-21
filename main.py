@@ -50,7 +50,7 @@ SPEED_METRICS = {
 class NetworkMonitor:
     def __init__(self):
         self.device_id = DEVICE_ID or SITE_ID or "TEMP_TEST_DATA"
-                self.ip_address = None
+        self.ip_address = None
         self._get_ip_and_location()
 
     def _get_ip_and_location(self):

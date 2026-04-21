@@ -73,8 +73,9 @@ class TestNetworkMonitor(unittest.TestCase):
         mock_file.assert_called_once_with("network-monitor/device_id", 'w')
         mock_file().write.assert_called_once_with("12345678-1234-5678-1234-567812345678")
 
-    @patch('requests.get')
-    def test_query_prometheus_success(self, mock_get):
+    @patch.object(NetworkMonitor, "_get_ip_and_location")
+    @patch("requests.get")
+    def test_query_prometheus_success(self, mock_get, mock_ip):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"data": {"result": [{"value": [0, "1"]}]}}
@@ -91,8 +92,9 @@ class TestNetworkMonitor(unittest.TestCase):
         result = monitor._query_prometheus("test_query")
         self.assertIsNone(result)
 
-    @patch('main.ping') # Correct patch target
-    def test_insert_ping_metrics(self, mock_ping):
+    @patch.object(NetworkMonitor, "_get_ip_and_location")
+    @patch("main.ping")  # Correct patch target
+    def test_insert_ping_metrics(self, mock_ping, mock_ip):
         monitor = NetworkMonitor()
         monitor.device_id = "test_device_id"
         metrics_data = {"metric1": 1, "metric2": 0.5}
@@ -102,6 +104,7 @@ class TestNetworkMonitor(unittest.TestCase):
             "metric1": 1,
             "metric2": 0.5,
             "device_id": "test_device_id",
+            "ip_address": None,
         }
         mock_ping.assert_called_once_with(expected_metrics_data)
 
@@ -200,8 +203,8 @@ class TestNetworkMonitor(unittest.TestCase):
         mock_monitor_instance = MagicMock()
         mock_network_monitor_class.return_value = mock_monitor_instance
 
-        # Mock asyncio.sleep to break the while loop after a few iterations
-        mock_async_sleep.side_effect = [asyncio.sleep(0.01), asyncio.sleep(0.01), asyncio.CancelledError]
+        # Mock asyncio.sleep: return immediately, then raise to exit loop
+        mock_async_sleep.side_effect = [None, None, asyncio.CancelledError()]
 
         # Call the main function
         with self.assertRaises(asyncio.CancelledError):
