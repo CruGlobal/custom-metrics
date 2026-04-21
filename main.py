@@ -14,7 +14,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ! This can be mapped in the internet pi stack "/etc/network-monitor/device_id"
-LOCATION = os.getenv("LOCATION", "Isenguard")
 SITE_ID = os.getenv("SITE_ID", "A_lost_palantir")
 DEVICE_ID = os.getenv("DEVICE_ID", "A_lost_palantir")
 DEVICE_ID_FILE = "network-monitor/device_id"
@@ -24,9 +23,9 @@ PING_METRICS = {
     "google_up": 'up{job="ping", instance="http://www.google.com/"}',
     "apple_up": 'up{job="ping", instance="https://www.apple.com/"}',
     "github_up": 'up{job="ping", instance="https://github.com/"}',
-    "cru_up": 'up{job="ping", instance="https://cru.org/"}',
-    "netsuite_up": 'up{job="ping", instance="https://netsuite.cru.org/"}',
-    "okta_up": 'up{job="ping", instance="https://www.okta.com/"}',
+    "windowsupdate_up": 'up{job="ping", instance="https://download.windowsupdate.com/"}',
+   # "netsuite_up": 'up{job="ping", instance="https://netsuite.cru.org/"}',
+    "signon_okta_up": 'up{job="ping", instance="https://signon.okta.com/"}',
     "pihole_up": 'up{job="pihole", instance="pihole-exporter:9617"}',
     "node_up": 'up{job="node", instance="nodeexp:9100"}',
     "speedtest_up": 'up{job="speedtest", instance="speedtest:9798"}',
@@ -50,8 +49,7 @@ SPEED_METRICS = {
 
 class NetworkMonitor:
     def __init__(self):
-        self.device_id = DEVICE_ID or SITE_ID or LOCATION or "TEMP_TEST_DATA"
-        self.location = f"{LOCATION}"
+        self.device_id = DEVICE_ID or SITE_ID or "TEMP_TEST_DATA"
 
     def _get_or_create_device_id(self):
         """Get existing site ID or create a new one."""
@@ -83,7 +81,6 @@ class NetworkMonitor:
         try:
             # Add device_id and location to metrics_data
             metrics_data["device_id"] = self.device_id
-            metrics_data["location"] = self.location  #
 
             ping(metrics_data)
             # logger.info(f"Successfully submitted {len(metrics_data)} ping metrics to Google Form")
@@ -95,7 +92,6 @@ class NetworkMonitor:
         try:
             # Add device_id and location to metrics_data
             metrics_data["device_id"] = self.device_id
-            metrics_data["location"] = self.location
 
             speed(metrics_data)
             # logger.info(f"Successfully submitted {len(metrics_data)} speed metrics to Google Form")
@@ -146,7 +142,6 @@ class NetworkMonitor:
             return
 
         metrics_data["device_id"] = self.device_id
-        metrics_data["location"] = self.location  # Pass only the location string
 
         for metric_name, query in SPEED_METRICS.items():
             result = self._query_prometheus(query)

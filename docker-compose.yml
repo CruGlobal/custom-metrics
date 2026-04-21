@@ -1,8 +1,6 @@
 services:
   custom-metrics:
     build: .
-    environment:
-      - LOCATION=${LOCATION}
     volumes:
       - custom_metrics_data:/data
     restart: unless-stopped

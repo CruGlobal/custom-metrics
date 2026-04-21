@@ -10,19 +10,14 @@ import asyncio
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from main import NetworkMonitor, PING_METRICS, SPEED_METRICS, main # Import main function
-import submit_to_google_form
 
 class TestNetworkMonitor(unittest.TestCase):
 
-    @patch.object(NetworkMonitor, '_get_ip_and_location')
-    @patch.object(NetworkMonitor, '_get_or_create_device_id', return_value="mock_device_id")
-    def setUp(self, mock_get_or_create_device_id, mock_get_ip_and_location):
+    def setUp(self):
         # Ensure a clean state for environment variables and device_id file
-        self.original_location_env = os.getenv("LOCATION")
         self.original_device_id_env = os.getenv("DEVICE_ID")
         self.original_prometheus_url_env = os.getenv("PROMETHEUS_URL")
 
-        os.environ["LOCATION"] = "TestLocation"
         os.environ["DEVICE_ID"] = "TestSiteID"
         os.environ["PROMETHEUS_URL"] = "http://mock-prometheus:9090"
 
@@ -33,13 +28,6 @@ class TestNetworkMonitor(unittest.TestCase):
             os.rmdir("network-monitor")
 
     def tearDown(self):
-        # Restore original environment variables
-        if self.original_location_env is not None:
-            os.environ["LOCATION"] = self.original_location_env
-        else:
-            if "LOCATION" in os.environ:
-                del os.environ["LOCATION"]
-
         if self.original_device_id_env is not None:
             os.environ["DEVICE_ID"] = self.original_device_id_env
         else:
@@ -57,14 +45,6 @@ class TestNetworkMonitor(unittest.TestCase):
             os.remove("network-monitor/device_id")
         if os.path.exists("network-monitor"):
             os.rmdir("network-monitor")
-
-    @patch('requests.get', side_effect=requests.exceptions.RequestException("Test Error"))
-    @patch.object(NetworkMonitor, '_get_or_create_device_id', return_value="mock_device_id") # Mock this to prevent file ops
-    def test_get_ip_and_location_failure(self, mock_get_or_create_device_id, mock_get):
-        monitor = NetworkMonitor()
-        monitor._get_ip_and_location()
-        self.assertIsNone(monitor.ip_address)
-        self.assertIsNone(monitor.location)
 
     @patch('os.path.exists')
     @patch('builtins.open', new_callable=mock_open, read_data="existing_device_id")
@@ -94,8 +74,7 @@ class TestNetworkMonitor(unittest.TestCase):
         mock_file().write.assert_called_once_with("12345678-1234-5678-1234-567812345678")
 
     @patch('requests.get')
-    @patch.object(NetworkMonitor, '_get_ip_and_location') # Mock this to prevent extra requests.get call
-    def test_query_prometheus_success(self, mock_get_ip_and_location, mock_get):
+    def test_query_prometheus_success(self, mock_get):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"data": {"result": [{"value": [0, "1"]}]}}
@@ -116,8 +95,6 @@ class TestNetworkMonitor(unittest.TestCase):
     def test_insert_ping_metrics(self, mock_ping):
         monitor = NetworkMonitor()
         monitor.device_id = "test_device_id"
-        monitor.location = "test_location"
-        monitor.ip_address = "1.1.1.1"
         metrics_data = {"metric1": 1, "metric2": 0.5}
         monitor._insert_ping_metrics(metrics_data)
 
@@ -125,8 +102,6 @@ class TestNetworkMonitor(unittest.TestCase):
             "metric1": 1,
             "metric2": 0.5,
             "device_id": "test_device_id",
-            "location": "test_location",
-            "ip_address": "1.1.1.1"
         }
         mock_ping.assert_called_once_with(expected_metrics_data)
 
@@ -134,8 +109,6 @@ class TestNetworkMonitor(unittest.TestCase):
     def test_insert_speed_metrics(self, mock_speed):
         monitor = NetworkMonitor()
         monitor.device_id = "test_device_id"
-        monitor.location = "test_location"
-        monitor.ip_address = "1.1.1.1"
         metrics_data = {"download_mbps": 100, "upload_mbps": 50}
         monitor._insert_speed_metrics(metrics_data)
 
@@ -143,8 +116,6 @@ class TestNetworkMonitor(unittest.TestCase):
             "download_mbps": 100,
             "upload_mbps": 50,
             "device_id": "test_device_id",
-            "location": "test_location",
-            "ip_address": "1.1.1.1"
         }
         mock_speed.assert_called_once_with(expected_metrics_data)
 
@@ -156,22 +127,20 @@ class TestNetworkMonitor(unittest.TestCase):
             {"data": {"result": [{"value": [0, "1"]}]}},  # google_up
             {"data": {"result": [{"value": [0, "1"]}]}},  # apple_up
             {"data": {"result": [{"value": [0, "1"]}]}},  # github_up
-            {"data": {"result": [{"value": [0, "1"]}]}},  # cru_up
-            {"data": {"result": [{"value": [0, "1"]}]}},  # netsuite_up
-            {"data": {"result": [{"value": [0, "1"]}]}},  # okta_up
+            {"data": {"result": [{"value": [0, "1"]}]}},  # windowsupdate_up
+            {"data": {"result": [{"value": [0, "1"]}]}},  # signon_okta_up
             {"data": {"result": [{"value": [0, "1"]}]}},  # pihole_up
             {"data": {"result": [{"value": [0, "1"]}]}},  # node_up
             {"data": {"result": [{"value": [0, "1"]}]}},  # speedtest_up
-            {"data": {"result": [{"value": [0, "0.123"]}]}}, # http_latency
-            {"data": {"result": [{"value": [0, "10"]}]}}, # http_samples
-            {"data": {"result": [{"value": [0, "0.5"]}]}}, # http_time
-            {"data": {"result": [{"value": [0, "100"]}]}}, # http_content_length
-            {"data": {"result": [{"value": [0, "0.2"]}]}}, # http_duration
+            {"data": {"result": [{"value": [0, "0.123"]}]}},  # http_latency
+            {"data": {"result": [{"value": [0, "10"]}]}},  # http_samples
+            {"data": {"result": [{"value": [0, "0.5"]}]}},  # http_time
+            {"data": {"result": [{"value": [0, "100"]}]}},  # http_content_length
+            {"data": {"result": [{"value": [0, "0.2"]}]}},  # http_duration
+            {"data": {"result": [{"value": [0, "3600"]}]}},  # uptime
         ]
         monitor = NetworkMonitor()
         monitor.device_id = "test_device_id"
-        monitor.location = "test_location"
-        monitor.ip_address = "1.1.1.1"
         monitor.collect_ping_metrics()
 
         expected_metrics = {
@@ -203,13 +172,10 @@ class TestNetworkMonitor(unittest.TestCase):
 
         monitor = NetworkMonitor()
         monitor.device_id = "test_device_id"
-        monitor.location = "test_location"
-        monitor.ip_address = "1.1.1.1"
         monitor.collect_speed_metrics()
 
         expected_metrics = {
             "device_id": "test_device_id",
-            "location": "test_location",
             "download_mbps": 100.0, # Converted from bits to Mbps
             "upload_mbps": 50.0,    # Converted from bits to Mbps
             "ping_ms": 25.5,
