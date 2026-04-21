@@ -17,9 +17,8 @@ class TestGoogleForm(unittest.TestCase):
     def test_format_data_ping(self, mock_send_form_request):
         metrics_data = {
             "device_id": "test_device_id",
-            "location": "test_location",
             "ip_address": "127.0.0.1",
-            "netsuite_up": 1,
+            "windowsupdate_up": 1,
             "http_latency": 0.05
         }
         
@@ -34,9 +33,8 @@ class TestGoogleForm(unittest.TestCase):
             expected_form_data = {
                 PING_FORM_ENTRY_IDS["local_timestamp"]: "2026-03-04 10:30:00",
                 PING_FORM_ENTRY_IDS["device_id"]: "test_device_id",
-                PING_FORM_ENTRY_IDS["location"]: "test_location",
                 PING_FORM_ENTRY_IDS["ip_address"]: "127.0.0.1",
-                PING_FORM_ENTRY_IDS["netsuite_up"]: "1",
+                PING_FORM_ENTRY_IDS["windowsupdate_up"]: "1",
                 PING_FORM_ENTRY_IDS["http_latency"]: "0.05"
             }
             mock_send_form_request.assert_called_once_with(expected_form_data, PING_FORM_URL)
@@ -45,11 +43,9 @@ class TestGoogleForm(unittest.TestCase):
     def test_format_data_speed(self, mock_send_form_request):
         metrics_data = {
             "device_id": "test_device_id_speed",
-            "location": "test_location_speed",
             "download_mbps": 100.5,
             "upload_mbps": 50.2,
-            "ip_address": "127.0.0.1",
-            "uptime": 12345.0,
+            "ping_ms": 12.0,
         }
 
         with patch('datetime.datetime') as mock_datetime:
@@ -63,11 +59,9 @@ class TestGoogleForm(unittest.TestCase):
             expected_form_data = {
                 SPEED_FORM_ENTRY_IDS["local_timestamp"]: "2026-03-04 11:00:00",
                 SPEED_FORM_ENTRY_IDS["device_id"]: "test_device_id_speed",
-                SPEED_FORM_ENTRY_IDS["location"]: "test_location_speed",
                 SPEED_FORM_ENTRY_IDS["download_mbps"]: "100.5",
                 SPEED_FORM_ENTRY_IDS["upload_mbps"]: "50.2",
-                SPEED_FORM_ENTRY_IDS["ip_address"]: "127.0.0.1",
-                SPEED_FORM_ENTRY_IDS["uptime"]: "12345.0",
+                SPEED_FORM_ENTRY_IDS["ping_ms"]: "12.0",
             }
             mock_send_form_request.assert_called_once_with(expected_form_data, SPEED_FORM_URL)
 
