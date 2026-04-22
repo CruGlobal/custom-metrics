@@ -24,7 +24,7 @@ PING_METRICS = {
     "apple_up": 'up{job="ping", instance="https://www.apple.com/"}',
     "github_up": 'up{job="ping", instance="https://github.com/"}',
     "windowsupdate_up": 'up{job="ping", instance="https://download.windowsupdate.com/"}',
-   # "netsuite_up": 'up{job="ping", instance="https://netsuite.cru.org/"}',
+    "netsuite_up": 'up{job="ping", instance="https://netsuite.cru.org/"}',
     "signon_okta_up": 'up{job="ping", instance="https://signon.okta.com/"}',
     "pihole_up": 'up{job="pihole", instance="pihole-exporter:9617"}',
     "node_up": 'up{job="node", instance="nodeexp:9100"}',
